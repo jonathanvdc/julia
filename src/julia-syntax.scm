@@ -2946,7 +2946,7 @@ f(x) = yt(x)
 
 (define lambda-opt-ignored-exprs
   (Set '(quote top core line inert local local-def unnecessary copyast
-         meta inbounds boundscheck simdloop decl
+         meta inbounds boundscheck simdloop decl detach reattach sync
          struct_type abstract_type primitive_type thunk with-static-parameters
          implicit-global global globalref outerref const-if-global
          const null ssavalue isdefined toplevel module lambda error
@@ -3966,7 +3966,7 @@ f(x) = yt(x)
                s))
 
             ;; metadata expressions
-            ((line meta inbounds simdloop gc_preserve_end)
+            ((line meta inbounds simdloop gc_preserve_end detach reattach sync)
              (let ((have-ret? (and (pair? code) (pair? (car code)) (eq? (caar code) 'return))))
                (cond ((eq? (car e) 'line)
                       (set! current-loc e)

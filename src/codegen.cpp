@@ -6245,6 +6245,50 @@ static std::unique_ptr<Module> emit_function(
             find_next_stmt(cursor + 1);
             continue;
         }
+#ifdef USE_TAPIR
+        if (jl_is_detachnode(stmt)) {
+            // int lsyncregion = jl_syncregion_label(stmt);
+            // int lname = jl_gotonode_label(stmt);
+            // Value *syncregion = get_syncregion(lsyncregion);
+            // BasicBlock *label = BasicBlock::Create(jl_LLVMContext, "TODO"); // TODO: get continue label
+            // BasicBlock *entry = BasicBlock::Create(jl_LLVMContext, "pfor.body.entry");
+            // ctx.builder.CreateDetach(entry, label, syncregion);
+            // ctx.builder.SetInsertPoint(entry);
+            // CreateDetach(BasicBlock *Detached, BasicBlock *Continue,
+            //              Value *SyncRegion
+            // IIUC:
+            // Detached -> should point to the BB that contains the parallel region
+            // Continue -> Should point to the loop latch, e.g. the reattach? or post the reattach
+            continue;
+        }
+        if (jl_is_reattachnode(stmt)) {
+            // int lsyncregion = jl_syncregion_label(stmt);
+            // int lname = jl_gotonode_label(stmt);
+            // Value *syncregion = get_syncregion(lsyncregion);
+            // BasicBlock *label = BasicBlock::Create(jl_LLVMContext, "TODO"); // TODO: get continue label
+            // ctx.builder.CreateReattach(label, syncregion);
+            // CreateReattach(BasicBlock *DetachContinue, Value *SyncRegion)
+            continue;
+        }
+        if (jl_is_syncnode(stmt)) {
+            // ??? ex = jl_syncregion_label(stmt);
+            // Value* syncregion;
+            // if (jl_is_ssavalue(ex)) {
+            //     ssize_t idx = ((jl_ssavalue_t*)ex)->id - 1;
+            //     assert(idx >= 0);
+            //     assert(ctx.ssavalue_assigned.at(idx));
+            //     syncregion = ctx.SAvalues.at(idx).Value;
+            // }
+            // BasicBlock *continueBlock = BasicBlock::Create(jl_LLVMContext, "sync.continue");
+            // ctx.builder.CreateSync(continueBlock, syncregion);
+            // ctx.builder.SetInsertPoint(continueBlock);
+            continue;
+        }
+#else
+        if(jl_is_detachnode(stmt) || jl_is_reattachnode(stmt) || jl_is_syncnode(stmt) || jl_is_syncregionnode(stmt)) {
+            continue;
+        }
+#endif
         if (expr && expr->head == goto_ifnot_sym) {
             jl_value_t **args = (jl_value_t**)jl_array_data(expr->args);
             jl_value_t *cond = args[0];

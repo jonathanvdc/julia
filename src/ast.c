@@ -61,6 +61,7 @@ jl_sym_t *macrocall_sym;  jl_sym_t *colon_sym;
 jl_sym_t *hygienicscope_sym; jl_sym_t *escape_sym;
 jl_sym_t *gc_preserve_begin_sym; jl_sym_t *gc_preserve_end_sym;
 jl_sym_t *throw_undef_if_not_sym; jl_sym_t *getfield_undefref_sym;
+jl_sym_t *detach_sym; jl_sym_t *reattach_sym; jl_sym_t *sync_sym;
 
 static uint8_t flisp_system_image[] = {
 #include <julia_flisp.boot.inc>
@@ -365,6 +366,9 @@ void jl_init_frontend(void)
     throw_undef_if_not_sym = jl_symbol("throw_undef_if_not");
     getfield_undefref_sym = jl_symbol("##getfield##");
     do_sym = jl_symbol("do");
+    detach_sym = jl_symbol("detach");
+    reattach_sym = jl_symbol("reattach");
+    sync_sym = jl_symbol("sync");
 }
 
 JL_DLLEXPORT void jl_lisp_prompt(void)
@@ -526,6 +530,18 @@ static jl_value_t *scm_to_julia_(fl_context_t *fl_ctx, value_t e, jl_module_t *m
             ex = scm_to_julia_(fl_ctx, car_(e), mod);
             temp = jl_new_struct(jl_gotonode_type, ex);
         }
+        // else if (sym == detach_sym) {
+        //     ex = scm_to_julia_(fl_ctx, car_(e), mod);
+        //     temp = jl_new_struct(jl_detachnode_type, ex);
+        // }
+        // else if (sym == reattach_sym) {
+        //     ex = scm_to_julia_(fl_ctx, car_(e), mod);
+        //     temp = jl_new_struct(jl_reattachnode_type, ex);
+        // }
+        // else if (sym == sync_sym) {
+        //     ex = scm_to_julia_(fl_ctx, car_(e), mod);
+        //     temp = jl_new_struct(jl_syncnode_type, ex);
+        // }
         else if (sym == newvar_sym) {
             ex = scm_to_julia_(fl_ctx, car_(e), mod);
             temp = jl_new_struct(jl_newvarnode_type, ex);
@@ -725,6 +741,12 @@ static value_t julia_to_scm_(fl_context_t *fl_ctx, jl_value_t *v)
     }
     if (jl_typeis(v, jl_gotonode_type))
         return julia_to_list2_noalloc(fl_ctx, (jl_value_t*)goto_sym, jl_fieldref(v,0));
+    if (jl_typeis(v, jl_detachnode_type))
+        return julia_to_list2_noalloc(fl_ctx, (jl_value_t*)detach_sym, jl_fieldref(v,0));
+    if (jl_typeis(v, jl_reattachnode_type))
+        return julia_to_list2_noalloc(fl_ctx, (jl_value_t*)reattach_sym, jl_fieldref(v,0));
+    if (jl_typeis(v, jl_syncnode_type))
+        return julia_to_list2_noalloc(fl_ctx, (jl_value_t*)sync_sym, jl_fieldref(v,0));
     if (jl_typeis(v, jl_quotenode_type))
         return julia_to_list2(fl_ctx, (jl_value_t*)inert_sym, jl_fieldref_noalloc(v,0));
     if (jl_typeis(v, jl_newvarnode_type))

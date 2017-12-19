@@ -96,6 +96,9 @@ jl_datatype_t *jl_pinode_type;
 jl_datatype_t *jl_phinode_type;
 jl_datatype_t *jl_phicnode_type;
 jl_datatype_t *jl_upsilonnode_type;
+jl_datatype_t *jl_detachnode_type;
+jl_datatype_t *jl_reattachnode_type;
+jl_datatype_t *jl_syncnode_type;
 jl_datatype_t *jl_quotenode_type;
 jl_datatype_t *jl_newvarnode_type;
 jl_datatype_t *jl_intrinsic_type;
@@ -2008,6 +2011,21 @@ void jl_init_types(void) JL_GC_DISABLED
                         jl_perm_symsvec(1, "val"),
                         jl_svec(1, jl_any_type), 0, 0, 0);
 
+    jl_detachnode_type =
+        jl_new_datatype(jl_symbol("DetachNode"), core, jl_any_type, jl_emptysvec,
+                        jl_perm_symsvec(2, "syncregion", "label"),
+                        jl_svec(2, jl_token_type, jl_long_type), 0, 0, 1);
+
+    jl_reattachnode_type =
+        jl_new_datatype(jl_symbol("ReattachNode"), core, jl_any_type, jl_emptysvec,
+                        jl_perm_symsvec(1, "syncregion"),
+                        jl_svec(1, jl_token_type), 0, 0, 1);
+
+    jl_syncnode_type =
+        jl_new_datatype(jl_symbol("SyncNode"), core, jl_any_type, jl_emptysvec,
+                        jl_perm_symsvec(1, "syncregion"),
+                        jl_svec(1, jl_token_type), 0, 0, 1);
+
     jl_quotenode_type =
         jl_new_datatype(jl_symbol("QuoteNode"), core, jl_any_type, jl_emptysvec,
                         jl_perm_symsvec(1, "value"),
@@ -2229,6 +2247,9 @@ void jl_init_types(void) JL_GC_DISABLED
     jl_compute_field_offsets(jl_linenumbernode_type);
     jl_compute_field_offsets(jl_lineinfonode_type);
     jl_compute_field_offsets(jl_gotonode_type);
+    jl_compute_field_offsets(jl_detachnode_type);
+    jl_compute_field_offsets(jl_reattachnode_type);
+    jl_compute_field_offsets(jl_syncnode_type);
     jl_compute_field_offsets(jl_quotenode_type);
     jl_compute_field_offsets(jl_pinode_type);
     jl_compute_field_offsets(jl_phinode_type);
