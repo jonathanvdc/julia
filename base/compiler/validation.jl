@@ -30,7 +30,6 @@ const VALID_EXPR_HEADS = IdDict{Any,Any}(
     :detach => 2:2,
     :reattach => 2:2,
     :sync => 1:1,
-    :syncregion => 0:0,
     :gc_preserve_begin => 0:typemax(Int),
     :gc_preserve_end => 0:typemax(Int),
     :thunk => 1:1,
@@ -149,7 +148,7 @@ function validate_code!(errors::Vector{>:InvalidCodeError}, c::CodeInfo, is_top_
                 head === :method || head === :global || head === :static_parameter ||
                 head === :new || head === :splatnew || head === :thunk || head === :simdloop ||
                 head === :throw_undef_if_not || head === :unreachable || head === :detach ||
-                head === :reattach || head === :sync || head === :syncregion
+                head === :reattach || head === :sync
                 validate_val!(x)
             else
                 # TODO: nothing is actually in statement position anymore

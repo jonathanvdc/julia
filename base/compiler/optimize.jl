@@ -154,7 +154,7 @@ function stmt_affects_purity(@nospecialize(stmt), ir)
     if isa(stmt, Expr)
         return stmt.head != :simdloop && stmt.head != :enter &&
         stmt.head != :detach && stmt.head != :reattach &&
-        stmt.head != :sync && stmt.head != :syncregion
+        stmt.head != :sync
     end
     return true
 end

@@ -62,7 +62,7 @@ end
 is_meta_expr_head(head::Symbol) = (head === :inbounds || head === :boundscheck ||
                                    head === :meta || head === :simdloop ||
                                    head === :detach || head === :reattach ||
-                                   head === :sync || head === :syncregion)
+                                   head === :sync)
 
 sym_isless(a::Symbol, b::Symbol) = ccall(:strcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}), a, b) < 0
 

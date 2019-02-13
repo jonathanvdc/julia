@@ -1132,8 +1132,7 @@ function typeinf_local(frame::InferenceState)
                         changes = StateUpdate(fname, VarState(Any, false), changes)
                     end
                 elseif hd === :inbounds || hd === :meta || hd === :simdloop ||
-                       hd === :detach || hd === :reattach || hd === :sync ||
-                       hd === :syncregion
+                       hd === :detach || hd === :reattach || hd === :sync
                 else
                     t = abstract_eval(stmt, changes, frame)
                     t === Bottom && break

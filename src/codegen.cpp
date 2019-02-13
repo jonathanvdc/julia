@@ -6285,7 +6285,7 @@ static std::unique_ptr<Module> emit_function(
             continue;
         }
 #else
-        if(jl_is_detachnode(stmt) || jl_is_reattachnode(stmt) || jl_is_syncnode(stmt) || jl_is_syncregionnode(stmt)) {
+        if(jl_is_detachnode(stmt) || jl_is_reattachnode(stmt) || jl_is_syncnode(stmt)) {
             continue;
         }
 #endif
