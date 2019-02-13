@@ -67,9 +67,12 @@ jl_datatype_t *jl_floatingpoint_type;
 jl_datatype_t *jl_number_type;
 jl_datatype_t *jl_signed_type;
 
+jl_datatype_t *jl_token_type;
+
 JL_DLLEXPORT jl_value_t *jl_emptytuple=NULL;
 jl_svec_t *jl_emptysvec;
 jl_value_t *jl_nothing;
+jl_value_t *jl_token;
 
 JL_DLLEXPORT jl_value_t *jl_true;
 JL_DLLEXPORT jl_value_t *jl_false;
@@ -1644,6 +1647,7 @@ void jl_init_types(void) JL_GC_DISABLED
     jl_simplevector_type = jl_new_uninitialized_datatype();
     jl_methtable_type = jl_new_uninitialized_datatype();
     jl_nothing = jl_gc_permobj(0, NULL);
+    jl_token = jl_gc_permobj(0, NULL);
 
     jl_default_cgparams.module_setup = jl_nothing;
     jl_default_cgparams.module_activation = jl_nothing;
@@ -1794,6 +1798,11 @@ void jl_init_types(void) JL_GC_DISABLED
                                          jl_emptysvec, jl_emptysvec, 0, 0, 0);
     jl_bottom_type = jl_new_struct(jl_typeofbottom_type);
     jl_typeofbottom_type->instance = jl_bottom_type;
+
+    jl_token_type = jl_new_datatype(jl_symbol("Token"), core, jl_any_type, jl_emptysvec,
+                                   jl_emptysvec, jl_emptysvec, 0, 0, 0);
+    jl_astaggedvalue(jl_token)->header = ((uintptr_t)jl_token_type) | GC_OLD_MARKED;
+    jl_token_type->instance = jl_token;
 
     jl_uniontype_type = jl_new_datatype(jl_symbol("Union"), core, type_type, jl_emptysvec,
                                         jl_perm_symsvec(2, "a", "b"),

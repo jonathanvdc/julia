@@ -597,6 +597,7 @@ extern JL_DLLEXPORT jl_unionall_t *jl_ref_type JL_GLOBALLY_ROOTED;
 extern JL_DLLEXPORT jl_typename_t *jl_pointer_typename JL_GLOBALLY_ROOTED;
 extern JL_DLLEXPORT jl_typename_t *jl_namedtuple_typename JL_GLOBALLY_ROOTED;
 extern JL_DLLEXPORT jl_unionall_t *jl_namedtuple_type JL_GLOBALLY_ROOTED;
+extern JL_DLLEXPORT jl_datatype_t *jl_token_type JL_GLOBALLY_ROOTED;
 
 extern JL_DLLEXPORT jl_value_t *jl_array_uint8_type JL_GLOBALLY_ROOTED;
 extern JL_DLLEXPORT jl_value_t *jl_array_any_type JL_GLOBALLY_ROOTED;
@@ -622,6 +623,7 @@ extern JL_DLLEXPORT jl_value_t *jl_emptytuple JL_GLOBALLY_ROOTED;
 extern JL_DLLEXPORT jl_value_t *jl_true JL_GLOBALLY_ROOTED;
 extern JL_DLLEXPORT jl_value_t *jl_false JL_GLOBALLY_ROOTED;
 extern JL_DLLEXPORT jl_value_t *jl_nothing JL_GLOBALLY_ROOTED;
+extern JL_DLLEXPORT jl_value_t *jl_token JL_GLOBALLY_ROOTED;
 
 // some important symbols
 extern JL_DLLEXPORT jl_sym_t *jl_incomplete_sym;

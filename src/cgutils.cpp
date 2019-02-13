@@ -506,6 +506,8 @@ JL_DLLEXPORT Type *julia_type_to_llvm(jl_value_t *jt, bool *isboxed)
     if (isboxed) *isboxed = false;
     if (jt == (jl_value_t*)jl_bottom_type)
         return T_void;
+    if (jt == (jl_value_t*)jl_token_type)
+        return T_token;
     if (jl_justbits(jt)) {
         if (jl_datatype_nbits(jt) == 0)
             return T_void;
@@ -570,6 +572,8 @@ static Type *julia_struct_to_llvm(jl_value_t *jt, jl_unionall_t *ua, bool *isbox
     if (isboxed) *isboxed = false;
     if (jt == (jl_value_t*)jl_bottom_type)
         return T_void;
+    if (jt == (jl_value_t*)jl_token_type)
+        return T_token;
     if (jl_is_primitivetype(jt))
         return bitstype_to_llvm(jt);
     if (jl_is_structtype(jt)) {

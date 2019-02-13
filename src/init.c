@@ -879,6 +879,8 @@ void jl_get_builtin_hooks(void)
     jl_uint32_type->super = jl_unsigned_type;
     jl_uint64_type->super = jl_unsigned_type;
 
+    jl_token_type  = (jl_datatype_t*)core("Token");
+
     jl_errorexception_type = (jl_datatype_t*)core("ErrorException");
     jl_stackovf_exception  = jl_new_struct_uninit((jl_datatype_t*)core("StackOverflowError"));
     jl_diverror_exception  = jl_new_struct_uninit((jl_datatype_t*)core("DivideError"));

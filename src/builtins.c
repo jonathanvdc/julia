@@ -1237,6 +1237,7 @@ void jl_init_primitives(void) JL_GC_DISABLED
     add_builtin("Type", (jl_value_t*)jl_type_type);
     add_builtin("Nothing", (jl_value_t*)jl_void_type);
     add_builtin("nothing", (jl_value_t*)jl_nothing);
+    add_builtin("token", (jl_value_t*)jl_token);
     add_builtin("TypeName", (jl_value_t*)jl_typename_type);
     add_builtin("DataType", (jl_value_t*)jl_datatype_type);
     add_builtin("TypeVar", (jl_value_t*)jl_tvar_type);
@@ -1282,6 +1283,7 @@ void jl_init_primitives(void) JL_GC_DISABLED
     add_builtin("NewvarNode", (jl_value_t*)jl_newvarnode_type);
     add_builtin("GlobalRef", (jl_value_t*)jl_globalref_type);
     add_builtin("NamedTuple", (jl_value_t*)jl_namedtuple_type);
+    add_builtin("Token", (jl_value_t*)jl_token_type);
 
     add_builtin("Bool", (jl_value_t*)jl_bool_type);
     add_builtin("UInt8", (jl_value_t*)jl_uint8_type);

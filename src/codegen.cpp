@@ -210,6 +210,7 @@ static Type *T_ppint8;
 static Type *T_pppint8;
 
 static Type *T_void;
+static Type *T_token;
 
 // type-based alias analysis nodes.  Indentation of comments indicates hierarchy.
 static MDNode *tbaa_gcframe;    // GC frame
@@ -6795,6 +6796,7 @@ static void init_julia_llvm_env(Module *m)
     T_pfloat64 = PointerType::get(T_float64, 0);
     T_float128 = Type::getFP128Ty(jl_LLVMContext);
     T_void = Type::getVoidTy(jl_LLVMContext);
+    T_token = Type::getTokenTy(jl_LLVMContext);
     T_pvoidfunc = FunctionType::get(T_void, /*isVarArg*/false)->getPointerTo();
 
     auto T_pint8_derived = PointerType::get(T_int8, AddressSpace::Derived);
