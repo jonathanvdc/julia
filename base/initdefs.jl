@@ -54,7 +54,7 @@ files. By default it includes:
 3. an architecture-independent shared system directory, e.g. `/usr/share/julia`.
 
 So `DEPOT_PATH` might be:
-```
+```julia
 [joinpath(homedir(), ".julia"), "/usr/local/share/julia", "/usr/share/julia"]
 ```
 The first entry is the "user depot" and should be writable by and owned by the
