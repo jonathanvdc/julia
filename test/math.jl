@@ -27,6 +27,8 @@ end
         clamp!(x, 1, 3)
         @test x == [1.0, 1.0, 2.0, 3.0, 3.0]
     end
+
+    @test ismissing(clamp(missing, 1, 2))
 end
 
 @testset "constants" begin

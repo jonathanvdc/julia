@@ -38,6 +38,7 @@ Standard library changes
 * `hasmethod` can now check for matching keyword argument names ([#30712]).
 * `startswith` and `endswith` now accept a `Regex` for the second argument ([#29790]).
 * `retry` supports arbitrary callable objects ([#30382]).
+* `clamp` can now handle missing values ([#31065]).
 
 #### LinearAlgebra
 
