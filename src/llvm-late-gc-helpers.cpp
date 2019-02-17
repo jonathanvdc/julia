@@ -21,8 +21,10 @@ void GCLoweringRefs::initFunctions(Module &M) {
 }
 
 void GCLoweringRefs::initAll(Module &M) {
+    // First initialize the functions.
     initFunctions(M);
 
+    // Then initialize types and metadata nodes.
     auto &ctx = M.getContext();
     T_size = M.getDataLayout().getIntPtrType(ctx);
     T_int8 = Type::getInt8Ty(ctx);
@@ -55,4 +57,16 @@ void GCLoweringRefs::initAll(Module &M) {
         T_pjlvalue_der = nullptr;
         T_ppjlvalue_der = nullptr;
     }
+}
+
+llvm::CallInst *GCLoweringRefs::getPtls(llvm::Function &F) {
+    for (auto I = F.getEntryBlock().begin(), E = F.getEntryBlock().end();
+         ptls_getter && I != E; ++I) {
+        if (CallInst *callInst = dyn_cast<CallInst>(&*I)) {
+            if (callInst->getCalledValue() == ptls_getter) {
+                return callInst;
+            }
+        }
+    }
+    return nullptr;
 }

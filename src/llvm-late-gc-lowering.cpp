@@ -320,6 +320,8 @@ protected:
     }
 
 private:
+    llvm::MDNode *tbaa_gcframe;
+    llvm::MDNode *tbaa_tag;
     Function *queueroot_func;
     Function *pool_alloc_func;
     Function *big_alloc_func;
@@ -2100,16 +2102,8 @@ bool LateLowerGCFrame::runOnFunction(Function &F) {
     initFunctions(*F.getParent());
     if (!ptls_getter)
         return CleanupIR(F);
-    ptlsStates = nullptr;
-    for (auto I = F.getEntryBlock().begin(), E = F.getEntryBlock().end();
-         ptls_getter && I != E; ++I) {
-        if (CallInst *callInst = dyn_cast<CallInst>(&*I)) {
-            if (callInst->getCalledValue() == ptls_getter) {
-                ptlsStates = callInst;
-                break;
-            }
-        }
-    }
+
+    ptlsStates = getPtls(F);
     if (!ptlsStates)
         return CleanupIR(F);
     State S = LocalScan(F);
