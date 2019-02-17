@@ -298,17 +298,11 @@ namespace llvm {
     void initializeLateLowerGCFramePass(PassRegistry &Registry);
 }
 
-extern std::pair<MDNode*,MDNode*> tbaa_make_child(const char *name, MDNode *parent=nullptr, bool isConstant=false);
 struct LateLowerGCFrame: public FunctionPass, private GCLoweringRefs {
     static char ID;
     LateLowerGCFrame() : FunctionPass(ID)
     {
         llvm::initializeDominatorTreeWrapperPassPass(*PassRegistry::getPassRegistry());
-        tbaa_gcframe = tbaa_make_child("jtbaa_gcframe").first;
-        MDNode *tbaa_data;
-        MDNode *tbaa_data_scalar;
-        std::tie(tbaa_data, tbaa_data_scalar) = tbaa_make_child("jtbaa_data");
-        tbaa_tag = tbaa_make_child("jtbaa_tag", tbaa_data_scalar).first;
     }
 
 protected:
@@ -320,8 +314,6 @@ protected:
     }
 
 private:
-    llvm::MDNode *tbaa_gcframe;
-    llvm::MDNode *tbaa_tag;
     Function *queueroot_func;
     Function *pool_alloc_func;
     Function *big_alloc_func;
@@ -2106,6 +2098,7 @@ bool LateLowerGCFrame::runOnFunction(Function &F) {
     ptlsStates = getPtls(F);
     if (!ptlsStates)
         return CleanupIR(F);
+
     State S = LocalScan(F);
     ComputeLiveness(S);
     std::vector<int> Colors = ColorRoots(S);

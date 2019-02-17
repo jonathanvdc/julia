@@ -10,7 +10,7 @@
 #include <llvm/IR/Type.h>
 
 // A data structure that contains references to platform-agnostic GC lowering
-// types and functions.
+// types, metadata and functions.
 struct GCLoweringRefs {
     llvm::Type *T_prjlvalue;
     llvm::Type *T_ppjlvalue;
@@ -21,6 +21,8 @@ struct GCLoweringRefs {
     llvm::Type *T_pjlvalue;
     llvm::Type *T_pjlvalue_der;
     llvm::Type *T_ppjlvalue_der;
+    llvm::MDNode *tbaa_gcframe;
+    llvm::MDNode *tbaa_tag;
     llvm::Function *ptls_getter;
     llvm::Function *gc_flush_func;
     llvm::Function *gc_preserve_begin_func;
@@ -30,6 +32,10 @@ struct GCLoweringRefs {
     llvm::Function *typeof_func;
     llvm::Function *write_barrier_func;
 
+    // Creates a GC lowering refs structure. Type and function pointers
+    // are set to `nullptr`. Metadata nodes are initialized.
+    GCLoweringRefs();
+
     // Populates a GC lowering refs structure by inspecting a module.
     void initAll(llvm::Module &M);
 
@@ -37,7 +43,7 @@ struct GCLoweringRefs {
     void initFunctions(llvm::Module &M);
 
     // Gets a call to the `julia.ptls_states` intrinisc in the entry
-    // point of the given function, if there exists such as call.
+    // point of the given function, if there exists such a call.
     // Otherwise, `nullptr` is returned.
     llvm::CallInst *getPtls(llvm::Function &F);
 };
