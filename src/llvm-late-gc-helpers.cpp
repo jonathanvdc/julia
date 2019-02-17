@@ -1,15 +1,48 @@
+// This file is a part of Julia. License is MIT: https://julialang.org/license
+//
+// This file implements common functionality that is useful for the late GC frame
+// lowering and final GC intrinsic lowering passes. See the corresponding header
+// for docs.
+
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
+#include <iostream>
+
 #include "llvm-version.h"
 #include "codegen_shared.h"
+#include "julia_assert.h"
 #include "llvm-late-gc-helpers.h"
 
 using namespace llvm;
 
+static const char* PUSH_NEW_GC_FRAME_NAME = "julia.push_new_gc_frame";
+
 extern std::pair<MDNode*,MDNode*> tbaa_make_child(const char *name, MDNode *parent=nullptr, bool isConstant=false);
+
+namespace jl_intrinsics {
+    llvm::Function* getOrDefinePushNewGCFrame(const GCLoweringRefs &refs, llvm::Module &M)
+    {
+        // We may have already defined the intrinsic. If so, return
+        // that value.
+        auto local = M.getFunction(PUSH_NEW_GC_FRAME_NAME);
+        if (local) {
+            return local;
+        }
+
+        // Otherwise, we'll just have to define it from scratch.
+        auto intrinsic = Function::Create(
+            FunctionType::get(PointerType::get(refs.T_prjlvalue, 0), {refs.T_size}, false),
+            Function::ExternalLinkage,
+            PUSH_NEW_GC_FRAME_NAME,
+            &M);
+        intrinsic->addAttribute(AttributeList::ReturnIndex, Attribute::NonNull);
+
+        return intrinsic;
+    }
+}
 
 GCLoweringRefs::GCLoweringRefs()
     : T_prjlvalue(nullptr), T_ppjlvalue(nullptr), T_size(nullptr), T_int8(nullptr),
@@ -17,7 +50,7 @@ GCLoweringRefs::GCLoweringRefs()
         T_ppjlvalue_der(nullptr), ptls_getter(nullptr), gc_flush_func(nullptr),
         gc_preserve_begin_func(nullptr), gc_preserve_end_func(nullptr),
         pointer_from_objref_func(nullptr), alloc_obj_func(nullptr), typeof_func(nullptr),
-        write_barrier_func(nullptr)
+        write_barrier_func(nullptr), push_new_gc_frame_func(nullptr)
 {
     tbaa_gcframe = tbaa_make_child("jtbaa_gcframe").first;
     MDNode *tbaa_data;
@@ -26,7 +59,8 @@ GCLoweringRefs::GCLoweringRefs()
     tbaa_tag = tbaa_make_child("jtbaa_tag", tbaa_data_scalar).first;
 }
 
-void GCLoweringRefs::initFunctions(Module &M) {
+void GCLoweringRefs::initFunctions(Module &M)
+{
     ptls_getter = M.getFunction("julia.ptls_states");
     gc_flush_func = M.getFunction("julia.gcroot_flush");
     gc_preserve_begin_func = M.getFunction("llvm.julia.gc_preserve_begin");
@@ -35,9 +69,11 @@ void GCLoweringRefs::initFunctions(Module &M) {
     typeof_func = M.getFunction("julia.typeof");
     write_barrier_func = M.getFunction("julia.write_barrier");
     alloc_obj_func = M.getFunction("julia.gc_alloc_obj");
+    push_new_gc_frame_func = M.getFunction(PUSH_NEW_GC_FRAME_NAME);
 }
 
-void GCLoweringRefs::initAll(Module &M) {
+void GCLoweringRefs::initAll(Module &M)
+{
     // First initialize the functions.
     initFunctions(M);
 
@@ -76,7 +112,8 @@ void GCLoweringRefs::initAll(Module &M) {
     }
 }
 
-llvm::CallInst *GCLoweringRefs::getPtls(llvm::Function &F) {
+llvm::CallInst *GCLoweringRefs::getPtls(llvm::Function &F) const
+{
     for (auto I = F.getEntryBlock().begin(), E = F.getEntryBlock().end();
          ptls_getter && I != E; ++I) {
         if (CallInst *callInst = dyn_cast<CallInst>(&*I)) {
