@@ -26,6 +26,7 @@
 #include "julia.h"
 #include "julia_internal.h"
 #include "julia_assert.h"
+#include "llvm-late-gc-helpers.h"
 
 #define DEBUG_TYPE "late_lower_gcroot"
 
@@ -298,7 +299,7 @@ namespace llvm {
 }
 
 extern std::pair<MDNode*,MDNode*> tbaa_make_child(const char *name, MDNode *parent=nullptr, bool isConstant=false);
-struct LateLowerGCFrame: public FunctionPass {
+struct LateLowerGCFrame: public FunctionPass, private GCLoweringRefs {
     static char ID;
     LateLowerGCFrame() : FunctionPass(ID)
     {
@@ -319,25 +320,6 @@ protected:
     }
 
 private:
-    Type *T_prjlvalue;
-    Type *T_ppjlvalue;
-    Type *T_size;
-    Type *T_int8;
-    Type *T_int32;
-    Type *T_pint8;
-    Type *T_pjlvalue;
-    Type *T_pjlvalue_der;
-    Type *T_ppjlvalue_der;
-    MDNode *tbaa_gcframe;
-    MDNode *tbaa_tag;
-    Function *ptls_getter;
-    Function *gc_flush_func;
-    Function *gc_preserve_begin_func;
-    Function *gc_preserve_end_func;
-    Function *pointer_from_objref_func;
-    Function *alloc_obj_func;
-    Function *typeof_func;
-    Function *write_barrier_func;
     Function *queueroot_func;
     Function *pool_alloc_func;
     Function *big_alloc_func;
@@ -369,7 +351,6 @@ private:
     void PlaceGCFrameStores(State &S, unsigned MinColorRoot, const std::vector<int> &Colors, Value *GCFrame);
     void PlaceRootsAndUpdateCalls(std::vector<int> &Colors, State &S, std::map<Value *, std::pair<int, int>>);
     bool doInitialization(Module &M) override;
-    void reinitFunctions(Module &M);
     bool doFinalization(Module &) override;
     bool runOnFunction(Function &F) override;
     Instruction *get_pgcstack(Instruction *ptlsStates);
@@ -2023,26 +2004,13 @@ void LateLowerGCFrame::PlaceRootsAndUpdateCalls(std::vector<int> &Colors, State 
     }
 }
 
-void LateLowerGCFrame::reinitFunctions(Module &M) {
-    ptls_getter = M.getFunction("julia.ptls_states");
-    gc_flush_func = M.getFunction("julia.gcroot_flush");
-    gc_preserve_begin_func = M.getFunction("llvm.julia.gc_preserve_begin");
-    gc_preserve_end_func = M.getFunction("llvm.julia.gc_preserve_end");
-    pointer_from_objref_func = M.getFunction("julia.pointer_from_objref");
-    typeof_func = M.getFunction("julia.typeof");
-    write_barrier_func = M.getFunction("julia.write_barrier");
-    alloc_obj_func = M.getFunction("julia.gc_alloc_obj");
-}
-
 bool LateLowerGCFrame::doInitialization(Module &M) {
-    ptls_getter = M.getFunction("julia.ptls_states");
+    // Initialize platform-agnostic references.
+    initAll(M);
+
+    // Initialize platform-specific references.
     auto &ctx = M.getContext();
-    T_size = M.getDataLayout().getIntPtrType(ctx);
-    T_int8 = Type::getInt8Ty(ctx);
-    T_pint8 = PointerType::get(T_int8, 0);
-    T_int32 = Type::getInt32Ty(ctx);
-    if ((write_barrier_func = M.getFunction("julia.write_barrier"))) {
-        T_prjlvalue = write_barrier_func->getFunctionType()->getParamType(0);
+    if (write_barrier_func) {
         if (!(queueroot_func = M.getFunction("jl_gc_queue_root"))) {
             queueroot_func = Function::Create(FunctionType::get(Type::getVoidTy(ctx),
                                                                 {T_prjlvalue}, false),
@@ -2055,8 +2023,7 @@ bool LateLowerGCFrame::doInitialization(Module &M) {
     }
     pool_alloc_func = nullptr;
     big_alloc_func = nullptr;
-    if ((alloc_obj_func = M.getFunction("julia.gc_alloc_obj"))) {
-        T_prjlvalue = alloc_obj_func->getReturnType();
+    if (alloc_obj_func) {
         if (!(pool_alloc_func = M.getFunction("jl_gc_pool_alloc"))) {
             std::vector<Type*> args(0);
             args.push_back(T_pint8);
@@ -2080,28 +2047,8 @@ bool LateLowerGCFrame::doInitialization(Module &M) {
                 alloc_obj_func->getAttributes().getRetAttributes(),
                 None));
         }
-        auto T_jlvalue = cast<PointerType>(T_prjlvalue)->getElementType();
-        T_pjlvalue = PointerType::get(T_jlvalue, 0);
-        T_ppjlvalue = PointerType::get(T_pjlvalue, 0);
-        T_pjlvalue_der = PointerType::get(T_jlvalue, AddressSpace::Derived);
-        T_ppjlvalue_der = PointerType::get(T_prjlvalue, AddressSpace::Derived);
     }
-    else if (ptls_getter) {
-        auto functype = ptls_getter->getFunctionType();
-        T_ppjlvalue = cast<PointerType>(functype->getReturnType())->getElementType();
-        T_pjlvalue = cast<PointerType>(T_ppjlvalue)->getElementType();
-        auto T_jlvalue = cast<PointerType>(T_pjlvalue)->getElementType();
-        T_prjlvalue = PointerType::get(T_jlvalue, AddressSpace::Tracked);
-        T_pjlvalue_der = PointerType::get(T_jlvalue, AddressSpace::Derived);
-        T_ppjlvalue_der = PointerType::get(T_prjlvalue, AddressSpace::Derived);
-    }
-    else {
-        T_ppjlvalue = nullptr;
-        T_prjlvalue = nullptr;
-        T_pjlvalue = nullptr;
-        T_pjlvalue_der = nullptr;
-        T_ppjlvalue_der = nullptr;
-    }
+
     GlobalValue *function_list[] = {queueroot_func, pool_alloc_func, big_alloc_func};
     unsigned j = 0;
     for (unsigned i = 0; i < sizeof(function_list) / sizeof(void*); i++) {
@@ -2150,7 +2097,7 @@ bool LateLowerGCFrame::doFinalization(Module &M)
 bool LateLowerGCFrame::runOnFunction(Function &F) {
     DEBUG(dbgs() << "GC ROOT PLACEMENT: Processing function " << F.getName() << "\n");
     // Check availability of functions again since they might have been deleted.
-    reinitFunctions(*F.getParent());
+    initFunctions(*F.getParent());
     if (!ptls_getter)
         return CleanupIR(F);
     ptlsStates = nullptr;
