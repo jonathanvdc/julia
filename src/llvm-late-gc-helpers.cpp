@@ -9,6 +9,23 @@
 
 using namespace llvm;
 
+extern std::pair<MDNode*,MDNode*> tbaa_make_child(const char *name, MDNode *parent=nullptr, bool isConstant=false);
+
+GCLoweringRefs::GCLoweringRefs()
+    : T_prjlvalue(nullptr), T_ppjlvalue(nullptr), T_size(nullptr), T_int8(nullptr),
+        T_int32(nullptr), T_pint8(nullptr), T_pjlvalue(nullptr), T_pjlvalue_der(nullptr),
+        T_ppjlvalue_der(nullptr), ptls_getter(nullptr), gc_flush_func(nullptr),
+        gc_preserve_begin_func(nullptr), gc_preserve_end_func(nullptr),
+        pointer_from_objref_func(nullptr), alloc_obj_func(nullptr), typeof_func(nullptr),
+        write_barrier_func(nullptr)
+{
+    tbaa_gcframe = tbaa_make_child("jtbaa_gcframe").first;
+    MDNode *tbaa_data;
+    MDNode *tbaa_data_scalar;
+    std::tie(tbaa_data, tbaa_data_scalar) = tbaa_make_child("jtbaa_data");
+    tbaa_tag = tbaa_make_child("jtbaa_tag", tbaa_data_scalar).first;
+}
+
 void GCLoweringRefs::initFunctions(Module &M) {
     ptls_getter = M.getFunction("julia.ptls_states");
     gc_flush_func = M.getFunction("julia.gcroot_flush");
