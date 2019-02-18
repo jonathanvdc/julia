@@ -133,6 +133,7 @@ namespace jl_intrinsics {
                 Function::ExternalLinkage,
                 NEW_GC_FRAME_NAME,
                 &M);
+            intrinsic->addAttribute(AttributeList::ReturnIndex, Attribute::NoAlias);
             intrinsic->addAttribute(AttributeList::ReturnIndex, Attribute::NonNull);
 
             return intrinsic;
