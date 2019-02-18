@@ -1,7 +1,7 @@
 // This file is a part of Julia. License is MIT: https://julialang.org/license
 
-#ifndef LLVM_LATE_GC_HELPERS_H
-#define LLVM_LATE_GC_HELPERS_H
+#ifndef LLVM_PASS_HELPERS_H
+#define LLVM_PASS_HELPERS_H
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Instructions.h>
@@ -10,15 +10,15 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
-struct GCLoweringRefs;
+struct JuliaPassContext;
 
-// A namespace for intrinsics definitions.
+// A namespace for Julia intrinsic definitions.
 namespace jl_intrinsics {
-    // An "intrinsic description," i.e., a function that can define an intrinsic
-    // in any environment.
+    // A description of an intrinsic that can be used to find existing
+    // intrinsics and materialize new intrinsics if necessary.
     struct IntrinsicDescription final {
         // The type of function that defines a new intrinsic.
-        typedef llvm::Function *(*DefinitionFunction)(llvm::Module &M, const GCLoweringRefs&);
+        typedef llvm::Function *(*DefinitionFunction)(llvm::Module &M, const JuliaPassContext&);
 
         // Creates an intrinsic description with a particular
         // name and definition function.
@@ -35,9 +35,10 @@ namespace jl_intrinsics {
     };
 }
 
-// A data structure that contains references to platform-agnostic GC lowering
-// types, metadata and functions.
-struct GCLoweringRefs {
+// A data structure that can read Julia-specific intrinsics
+// from modules or add them if they're not available yet.
+// Mainly useful for building Julia-specific LLVM passes.
+struct JuliaPassContext {
     llvm::Module *module;
 
     llvm::Type *T_prjlvalue;
@@ -62,7 +63,7 @@ struct GCLoweringRefs {
 
     // Creates a GC lowering refs structure. Type and function pointers
     // are set to `nullptr`. Metadata nodes are initialized.
-    GCLoweringRefs();
+    JuliaPassContext();
 
     // Populates a GC lowering refs structure by inspecting a module.
     // Also sets the current module to the given module.

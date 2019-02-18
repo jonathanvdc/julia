@@ -26,7 +26,7 @@
 #include "julia.h"
 #include "julia_internal.h"
 #include "julia_assert.h"
-#include "llvm-late-gc-helpers.h"
+#include "llvm-pass-helpers.h"
 
 #define DEBUG_TYPE "late_lower_gcroot"
 
@@ -298,7 +298,7 @@ namespace llvm {
     void initializeLateLowerGCFramePass(PassRegistry &Registry);
 }
 
-struct LateLowerGCFrame: public FunctionPass, private GCLoweringRefs {
+struct LateLowerGCFrame: public FunctionPass, private JuliaPassContext {
     static char ID;
     LateLowerGCFrame() : FunctionPass(ID)
     {
