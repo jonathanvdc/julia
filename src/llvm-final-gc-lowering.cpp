@@ -52,9 +52,12 @@ llvm::Instruction *FinalLowerGC::lowerNewGCFrame(llvm::CallInst *target, Functio
     unsigned nRoots = cast<ConstantInt>(target->getArgOperand(0))->getLimitedValue(INT_MAX);
 
     // Create the GC frame.
-    AllocaInst *gcframe = new AllocaInst(T_prjlvalue, 0,
-        ConstantInt::get(T_int32, nRoots + 2), "gcframe");
+    AllocaInst *gcframe = new AllocaInst(
+        T_prjlvalue,
+        0,
+        ConstantInt::get(T_int32, nRoots + 2));
     gcframe->insertAfter(target);
+    gcframe->takeName(target);
 
     // Zero out the GC frame.
     BitCastInst *tempSlot_i8 = new BitCastInst(gcframe, Type::getInt8PtrTy(F.getContext()), "");
