@@ -1853,18 +1853,21 @@ void LateLowerGCFrame::PlaceGCFrameStore(State &S, unsigned R, unsigned MinColor
                                          const std::vector<int> &Colors, Value *GCFrame,
                                          Instruction *InsertionPoint) {
     Value *Val = GetPtrForNumber(S, R, InsertionPoint);
-    Value *args[1] = {
-        ConstantInt::get(T_int32, Colors[R]+MinColorRoot)
-    };
-    GetElementPtrInst *gep = GetElementPtrInst::Create(T_prjlvalue, GCFrame, makeArrayRef(args));
-    gep->insertBefore(InsertionPoint);
+
+    // Get the slot address.
+    auto slotAddress = CallInst::Create(
+        getOrDefine(jl_intrinsics::getGCFrameSlot),
+        {GCFrame, ConstantInt::get(T_int32, Colors[R] + MinColorRoot)});
+
+    slotAddress->insertBefore(InsertionPoint);
+
     Val = MaybeExtractUnion(std::make_pair(Val, -1), InsertionPoint);
     // Pointee types don't have semantics, so the optimizer is
     // free to rewrite them if convenient. We need to change
     // it back here for the store.
     if (Val->getType() != T_prjlvalue)
         Val = new BitCastInst(Val, T_prjlvalue, "", InsertionPoint);
-    new StoreInst(Val, gep, InsertionPoint);
+    new StoreInst(Val, slotAddress, InsertionPoint);
 }
 
 void LateLowerGCFrame::PlaceGCFrameStores(State &S, unsigned MinColorRoot,
@@ -1914,14 +1917,15 @@ void LateLowerGCFrame::PlaceRootsAndUpdateCalls(std::vector<int> &Colors, State 
         pushGcframe->insertAfter(ptlsStates);
 
         // Replace Allocas
-        unsigned AllocaSlot = 2;
+        unsigned AllocaSlot = 0;
         for (AllocaInst *AI : S.Allocas) {
-            Value *args[1] = {
-                ConstantInt::get(T_int32, AllocaSlot++)
-            };
-            GetElementPtrInst *gep = GetElementPtrInst::Create(T_prjlvalue, gcframe, makeArrayRef(args));
-            gep->insertAfter(gcframe);
-            gep->takeName(AI);
+            // Pick a slot for the alloca.
+            auto slotAddress = CallInst::Create(
+                getOrDefine(jl_intrinsics::getGCFrameSlot),
+                {gcframe, ConstantInt::get(T_int32, AllocaSlot++)});
+            slotAddress->insertAfter(gcframe);
+            slotAddress->takeName(AI);
+
             // Check for lifetime intrinsics on this alloca, we can't keep them
             // because we're changing the semantics
             std::vector<CallInst*> ToDelete;
@@ -1934,7 +1938,7 @@ void LateLowerGCFrame::PlaceRootsAndUpdateCalls(std::vector<int> &Colors, State 
             }, AI);
             for (CallInst *II : ToDelete)
                 II->eraseFromParent();
-            AI->replaceAllUsesWith(gep);
+            AI->replaceAllUsesWith(slotAddress);
             AI->eraseFromParent();
         }
         unsigned MinColorRoot = AllocaSlot;
