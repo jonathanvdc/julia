@@ -145,6 +145,12 @@ bool FinalLowerGC::runOnFunction(Function &F)
     if (!ptlsStates)
         return true;
 
+    auto &M = *F.getParent();
+
+    auto new_gc_frame_func = getOrNull(jl_intrinsics::newGCFrame, M);
+    auto push_gc_frame_func = getOrNull(jl_intrinsics::pushGCFrame, M);
+    auto pop_gc_frame_func = getOrNull(jl_intrinsics::popGCFrame, M);
+
     // Lower all calls to supported intrinsics.
     for (BasicBlock &BB : F) {
         for (auto it = BB.begin(); it != BB.end();) {

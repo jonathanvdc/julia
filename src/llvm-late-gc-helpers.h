@@ -58,9 +58,6 @@ struct GCLoweringRefs {
     llvm::Function *alloc_obj_func;
     llvm::Function *typeof_func;
     llvm::Function *write_barrier_func;
-    llvm::Function *new_gc_frame_func;
-    llvm::Function *push_gc_frame_func;
-    llvm::Function *pop_gc_frame_func;
 
     // Creates a GC lowering refs structure. Type and function pointers
     // are set to `nullptr`. Metadata nodes are initialized.
