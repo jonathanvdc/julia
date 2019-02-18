@@ -21,10 +21,10 @@ using namespace llvm;
 extern std::pair<MDNode*,MDNode*> tbaa_make_child(const char *name, MDNode *parent=nullptr, bool isConstant=false);
 
 GCLoweringRefs::GCLoweringRefs()
-    : T_prjlvalue(nullptr), T_ppjlvalue(nullptr), T_size(nullptr), T_int8(nullptr),
-        T_int32(nullptr), T_pint8(nullptr), T_pjlvalue(nullptr), T_pjlvalue_der(nullptr),
-        T_ppjlvalue_der(nullptr), ptls_getter(nullptr), gc_flush_func(nullptr),
-        gc_preserve_begin_func(nullptr), gc_preserve_end_func(nullptr),
+    : module(nullptr), T_prjlvalue(nullptr), T_ppjlvalue(nullptr), T_size(nullptr),
+        T_int8(nullptr), T_int32(nullptr), T_pint8(nullptr), T_pjlvalue(nullptr),
+        T_pjlvalue_der(nullptr), T_ppjlvalue_der(nullptr), ptls_getter(nullptr),
+        gc_flush_func(nullptr), gc_preserve_begin_func(nullptr), gc_preserve_end_func(nullptr),
         pointer_from_objref_func(nullptr), alloc_obj_func(nullptr), typeof_func(nullptr),
         write_barrier_func(nullptr)
 {
@@ -37,6 +37,8 @@ GCLoweringRefs::GCLoweringRefs()
 
 void GCLoweringRefs::initFunctions(Module &M)
 {
+    module = &M;
+
     ptls_getter = M.getFunction("julia.ptls_states");
     gc_flush_func = M.getFunction("julia.gcroot_flush");
     gc_preserve_begin_func = M.getFunction("llvm.julia.gc_preserve_begin");
@@ -101,22 +103,20 @@ llvm::CallInst *GCLoweringRefs::getPtls(llvm::Function &F) const
 }
 
 llvm::Function *GCLoweringRefs::getOrNull(
-    const jl_intrinsics::IntrinsicDescription &desc,
-    llvm::Module &M) const
+    const jl_intrinsics::IntrinsicDescription &desc) const
 {
-    return M.getFunction(desc.name);
+    return module->getFunction(desc.name);
 }
 
 llvm::Function *GCLoweringRefs::getOrDefine(
-    const jl_intrinsics::IntrinsicDescription &desc,
-    llvm::Module &M) const
+    const jl_intrinsics::IntrinsicDescription &desc) const
 {
-    auto local = getOrNull(desc, M);
+    auto local = getOrNull(desc);
     if (local) {
         return local;
     }
     else {
-        return desc.define(*this, M);
+        return desc.define(*module, *this);
     }
 }
 
@@ -127,7 +127,7 @@ namespace jl_intrinsics {
 
     const IntrinsicDescription newGCFrame(
         NEW_GC_FRAME_NAME,
-        [](const GCLoweringRefs &refs, llvm::Module &M) {
+        [](llvm::Module &M, const GCLoweringRefs &refs) {
             auto intrinsic = Function::Create(
                 FunctionType::get(PointerType::get(refs.T_prjlvalue, 0), {refs.T_size}, false),
                 Function::ExternalLinkage,
@@ -141,7 +141,7 @@ namespace jl_intrinsics {
 
     const IntrinsicDescription pushGCFrame(
         PUSH_GC_FRAME_NAME,
-        [](const GCLoweringRefs &refs, llvm::Module &M) {
+        [](llvm::Module &M, const GCLoweringRefs &refs) {
             auto intrinsic = Function::Create(
                 FunctionType::get(
                     Type::getVoidTy(M.getContext()),
@@ -156,7 +156,7 @@ namespace jl_intrinsics {
 
     const IntrinsicDescription popGCFrame(
         POP_GC_FRAME_NAME,
-        [](const GCLoweringRefs &refs, llvm::Module &M) {
+        [](llvm::Module &M, const GCLoweringRefs &refs) {
             auto intrinsic = Function::Create(
                 FunctionType::get(
                     Type::getVoidTy(M.getContext()),

@@ -1903,13 +1903,13 @@ void LateLowerGCFrame::PlaceRootsAndUpdateCalls(std::vector<int> &Colors, State 
         unsigned NRoots = MaxColor + 1 + S.Allocas.size();
         // Create and push a GC frame.
         auto gcframe = CallInst::Create(
-            getOrDefine(jl_intrinsics::newGCFrame, *F->getParent()),
+            getOrDefine(jl_intrinsics::newGCFrame),
             {ConstantInt::get(T_size, NRoots)},
             "gcframe");
         gcframe->insertBefore(&*F->getEntryBlock().begin());
 
         auto pushGcframe = CallInst::Create(
-            getOrDefine(jl_intrinsics::pushGCFrame, *F->getParent()),
+            getOrDefine(jl_intrinsics::pushGCFrame),
             {gcframe, ConstantInt::get(T_size, NRoots)});
         pushGcframe->insertAfter(ptlsStates);
 
@@ -1944,7 +1944,7 @@ void LateLowerGCFrame::PlaceRootsAndUpdateCalls(std::vector<int> &Colors, State 
         for(Function::iterator I = F->begin(), E = F->end(); I != E; ++I) {
             if (isa<ReturnInst>(I->getTerminator())) {
                 auto popGcframe = CallInst::Create(
-                    getOrDefine(jl_intrinsics::popGCFrame, *F->getParent()),
+                    getOrDefine(jl_intrinsics::popGCFrame),
                     {gcframe});
                 popGcframe->insertBefore(I->getTerminator());
             }
