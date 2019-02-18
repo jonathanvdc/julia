@@ -35,21 +35,23 @@ private:
     bool doInitialization(Module &M) override;
     bool runOnFunction(Function &F) override;
 
-    // Lowers a `julia.push_new_gc_frame` intrinsic.
-    llvm::Instruction *lowerPushNewGCFrame(llvm::CallInst *target, unsigned nRoots, Function &F);
+    // Lowers a `julia.new_gc_frame` intrinsic.
+    llvm::Instruction *lowerNewGCFrame(llvm::CallInst *target, Function &F);
 
-    // Pushes a GC frame.
-    void pushGCFrame(AllocaInst *gcframe, unsigned nRoots, Instruction *insertAfter);
+    // Lowers a `julia.push_gc_frame` intrinsic.
+    void lowerPushGCFrame(llvm::CallInst *target, Function &F);
 
     Instruction *getPgcstack(Instruction *ptlsStates);
 };
 
-llvm::Instruction *FinalLowerGC::lowerPushNewGCFrame(llvm::CallInst *target, unsigned nRoots, Function &F)
+llvm::Instruction *FinalLowerGC::lowerNewGCFrame(llvm::CallInst *target, Function &F)
 {
+    unsigned nRoots = cast<ConstantInt>(target->getArgOperand(0))->getLimitedValue(INT_MAX);
+
     // Create the GC frame.
     AllocaInst *gcframe = new AllocaInst(T_prjlvalue, 0,
         ConstantInt::get(T_int32, nRoots + 2), "gcframe");
-    gcframe->insertBefore(&*F.getEntryBlock().begin());
+    gcframe->insertAfter(target);
 
     // Zero out the GC frame.
     BitCastInst *tempSlot_i8 = new BitCastInst(gcframe, Type::getInt8PtrTy(F.getContext()), "");
@@ -66,16 +68,16 @@ llvm::Instruction *FinalLowerGC::lowerPushNewGCFrame(llvm::CallInst *target, uns
     zeroing->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_gcframe);
     zeroing->insertAfter(tempSlot_i8);
 
-    // Push the GC frame.
-    pushGCFrame(gcframe, nRoots, target);
-
     return gcframe;
 }
 
-void FinalLowerGC::pushGCFrame(AllocaInst *gcframe, unsigned nRoots, Instruction *insertAfter)
+void FinalLowerGC::lowerPushGCFrame(llvm::CallInst *target, Function &F)
 {
-    IRBuilder<> builder(gcframe->getContext());
-    builder.SetInsertPoint(&*(++BasicBlock::iterator(insertAfter)));
+    auto gcframe = target->getArgOperand(0);
+    unsigned nRoots = cast<ConstantInt>(target->getArgOperand(1))->getLimitedValue(INT_MAX);
+
+    IRBuilder<> builder(target->getContext());
+    builder.SetInsertPoint(&*(++BasicBlock::iterator(target)));
     Instruction *inst =
         builder.CreateStore(ConstantInt::get(T_size, nRoots << 1),
                           builder.CreateBitCast(builder.CreateConstGEP1_32(gcframe, 0), T_size->getPointerTo()));
@@ -126,11 +128,15 @@ bool FinalLowerGC::runOnFunction(Function &F)
 
             auto callee = CI->getCalledValue();
 
-            if (callee == push_new_gc_frame_func) {
-                auto *nRoots = cast<ConstantInt>(CI->getArgOperand(0));
-                CI->replaceAllUsesWith(lowerPushNewGCFrame(CI, nRoots->getLimitedValue(), F));
+            if (callee == new_gc_frame_func) {
+                CI->replaceAllUsesWith(lowerNewGCFrame(CI, F));
                 it = CI->eraseFromParent();
-            } else {
+            }
+            else if (callee == push_gc_frame_func) {
+                lowerPushGCFrame(CI, F);
+                it = CI->eraseFromParent();
+            }
+            else {
                 ++it;
             }
         }

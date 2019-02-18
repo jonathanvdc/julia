@@ -32,7 +32,8 @@ struct GCLoweringRefs {
     llvm::Function *alloc_obj_func;
     llvm::Function *typeof_func;
     llvm::Function *write_barrier_func;
-    llvm::Function *push_new_gc_frame_func;
+    llvm::Function *new_gc_frame_func;
+    llvm::Function *push_gc_frame_func;
 
     // Creates a GC lowering refs structure. Type and function pointers
     // are set to `nullptr`. Metadata nodes are initialized.
@@ -52,9 +53,13 @@ struct GCLoweringRefs {
 
 // A namespace for getting and creating intrinsics.
 namespace jl_intrinsics {
-    // Gets or creates an intrinsic that creates and pushes a new GC frame.
+    // Gets or creates an intrinsic that creates a new GC frame.
     // The intrinsic gets added to the module if it doesn't exist already.
-    llvm::Function* getOrDefinePushNewGCFrame(const GCLoweringRefs &refs, llvm::Module &M);
+    llvm::Function* getOrDefineNewGCFrame(const GCLoweringRefs &refs, llvm::Module &M);
+
+    // Gets or creates an intrinsic that pushes a GC frame.
+    // The intrinsic gets added to the module if it doesn't exist already.
+    llvm::Function* getOrDefinePushGCFrame(const GCLoweringRefs &refs, llvm::Module &M);
 }
 
 #endif

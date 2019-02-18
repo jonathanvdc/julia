@@ -18,16 +18,17 @@
 
 using namespace llvm;
 
-static const char* PUSH_NEW_GC_FRAME_NAME = "julia.push_new_gc_frame";
+static const char* NEW_GC_FRAME_NAME = "julia.new_gc_frame";
+static const char* PUSH_GC_FRAME_NAME = "julia.push_gc_frame";
 
 extern std::pair<MDNode*,MDNode*> tbaa_make_child(const char *name, MDNode *parent=nullptr, bool isConstant=false);
 
 namespace jl_intrinsics {
-    llvm::Function* getOrDefinePushNewGCFrame(const GCLoweringRefs &refs, llvm::Module &M)
+    llvm::Function* getOrDefineNewGCFrame(const GCLoweringRefs &refs, llvm::Module &M)
     {
         // We may have already defined the intrinsic. If so, return
         // that value.
-        auto local = M.getFunction(PUSH_NEW_GC_FRAME_NAME);
+        auto local = M.getFunction(NEW_GC_FRAME_NAME);
         if (local) {
             return local;
         }
@@ -36,9 +37,31 @@ namespace jl_intrinsics {
         auto intrinsic = Function::Create(
             FunctionType::get(PointerType::get(refs.T_prjlvalue, 0), {refs.T_size}, false),
             Function::ExternalLinkage,
-            PUSH_NEW_GC_FRAME_NAME,
+            NEW_GC_FRAME_NAME,
             &M);
         intrinsic->addAttribute(AttributeList::ReturnIndex, Attribute::NonNull);
+
+        return intrinsic;
+    }
+
+    llvm::Function* getOrDefinePushGCFrame(const GCLoweringRefs &refs, llvm::Module &M)
+    {
+        // We may have already defined the intrinsic. If so, return
+        // that value.
+        auto local = M.getFunction(PUSH_GC_FRAME_NAME);
+        if (local) {
+            return local;
+        }
+
+        // Otherwise, we'll just have to define it from scratch.
+        auto intrinsic = Function::Create(
+            FunctionType::get(
+                Type::getVoidTy(M.getContext()),
+                {PointerType::get(refs.T_prjlvalue, 0), refs.T_size},
+                false),
+            Function::ExternalLinkage,
+            PUSH_GC_FRAME_NAME,
+            &M);
 
         return intrinsic;
     }
@@ -50,7 +73,7 @@ GCLoweringRefs::GCLoweringRefs()
         T_ppjlvalue_der(nullptr), ptls_getter(nullptr), gc_flush_func(nullptr),
         gc_preserve_begin_func(nullptr), gc_preserve_end_func(nullptr),
         pointer_from_objref_func(nullptr), alloc_obj_func(nullptr), typeof_func(nullptr),
-        write_barrier_func(nullptr), push_new_gc_frame_func(nullptr)
+        write_barrier_func(nullptr), new_gc_frame_func(nullptr), push_gc_frame_func(nullptr)
 {
     tbaa_gcframe = tbaa_make_child("jtbaa_gcframe").first;
     MDNode *tbaa_data;
@@ -69,7 +92,8 @@ void GCLoweringRefs::initFunctions(Module &M)
     typeof_func = M.getFunction("julia.typeof");
     write_barrier_func = M.getFunction("julia.write_barrier");
     alloc_obj_func = M.getFunction("julia.gc_alloc_obj");
-    push_new_gc_frame_func = M.getFunction(PUSH_NEW_GC_FRAME_NAME);
+    new_gc_frame_func = M.getFunction(NEW_GC_FRAME_NAME);
+    push_gc_frame_func = M.getFunction(PUSH_GC_FRAME_NAME);
 }
 
 void GCLoweringRefs::initAll(Module &M)
