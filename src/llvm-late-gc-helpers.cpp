@@ -26,8 +26,7 @@ GCLoweringRefs::GCLoweringRefs()
         T_ppjlvalue_der(nullptr), ptls_getter(nullptr), gc_flush_func(nullptr),
         gc_preserve_begin_func(nullptr), gc_preserve_end_func(nullptr),
         pointer_from_objref_func(nullptr), alloc_obj_func(nullptr), typeof_func(nullptr),
-        write_barrier_func(nullptr), new_gc_frame_func(nullptr), push_gc_frame_func(nullptr),
-        pop_gc_frame_func(nullptr)
+        write_barrier_func(nullptr)
 {
     tbaa_gcframe = tbaa_make_child("jtbaa_gcframe").first;
     MDNode *tbaa_data;
@@ -46,9 +45,6 @@ void GCLoweringRefs::initFunctions(Module &M)
     typeof_func = M.getFunction("julia.typeof");
     write_barrier_func = M.getFunction("julia.write_barrier");
     alloc_obj_func = M.getFunction("julia.gc_alloc_obj");
-    new_gc_frame_func = getOrNull(jl_intrinsics::newGCFrame, M);
-    push_gc_frame_func = getOrNull(jl_intrinsics::pushGCFrame, M);
-    pop_gc_frame_func = getOrNull(jl_intrinsics::popGCFrame, M);
 }
 
 void GCLoweringRefs::initAll(Module &M)
