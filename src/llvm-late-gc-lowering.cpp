@@ -338,7 +338,6 @@ private:
     State LocalScan(Function &F);
     void ComputeLiveness(State &S);
     void ComputeLiveSets(State &S);
-    void PopGCFrame(Instruction *gcframe, Instruction *InsertBefore);
     std::vector<int> ColorRoots(const State &S);
     void PlaceGCFrameStore(State &S, unsigned R, unsigned MinColorRoot, const std::vector<int> &Colors, Value *GCFrame, Instruction *InsertionPoint);
     void PlaceGCFrameStores(State &S, unsigned MinColorRoot, const std::vector<int> &Colors, Value *GCFrame);
@@ -346,7 +345,6 @@ private:
     bool doInitialization(Module &M) override;
     bool doFinalization(Module &) override;
     bool runOnFunction(Function &F) override;
-    Instruction *get_pgcstack(Instruction *ptlsStates);
     bool CleanupIR(Function &F, State *S=nullptr);
     void NoteUseChain(State &S, BBState &BBS, User *TheUser);
     SmallVector<int, 1> GetPHIRefinements(PHINode *phi, State &S);
@@ -1586,29 +1584,6 @@ std::vector<int> LateLowerGCFrame::ColorRoots(const State &S) {
     return Colors;
 }
 
-Instruction *LateLowerGCFrame::get_pgcstack(Instruction *ptlsStates)
-{
-    Constant *offset = ConstantInt::getSigned(T_int32, offsetof(jl_tls_states_t, pgcstack) / sizeof(void*));
-    return GetElementPtrInst::Create(nullptr,
-                                     ptlsStates,
-                                     ArrayRef<Value*>(offset),
-                                     "jl_pgcstack");
-}
-
-void LateLowerGCFrame::PopGCFrame(Instruction *gcframe, Instruction *InsertBefore) {
-    IRBuilder<> builder(InsertBefore->getContext());
-    builder.SetInsertPoint(InsertBefore); // set insert *before* Ret
-    Instruction *gcpop =
-        cast<Instruction>(builder.CreateConstGEP1_32(gcframe, 1));
-    Instruction *inst = builder.CreateLoad(gcpop);
-    inst->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_gcframe);
-    inst = builder.CreateStore(inst,
-                               builder.CreateBitCast(
-                                 builder.Insert(get_pgcstack(ptlsStates)),
-                                 PointerType::get(T_prjlvalue, 0)));
-    inst->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_gcframe);
-}
-
 // Size of T is assumed to be `sizeof(void*)`
 Value *LateLowerGCFrame::EmitTagPtr(IRBuilder<> &builder, Type *T, Value *V)
 {
@@ -1933,10 +1908,10 @@ void LateLowerGCFrame::PlaceRootsAndUpdateCalls(std::vector<int> &Colors, State 
             "gcframe_ptr");
         gcframe->insertBefore(&*F->getEntryBlock().begin());
 
-        auto push_gcframe = CallInst::Create(
+        auto pushGcframe = CallInst::Create(
             jl_intrinsics::getOrDefinePushGCFrame(*this, *F->getParent()),
             {gcframe, ConstantInt::get(T_size, NRoots)});
-        push_gcframe->insertAfter(ptlsStates);
+        pushGcframe->insertAfter(ptlsStates);
 
         // Replace Allocas
         unsigned AllocaSlot = 2;
@@ -1968,7 +1943,10 @@ void LateLowerGCFrame::PlaceRootsAndUpdateCalls(std::vector<int> &Colors, State 
         // Insert GCFrame pops
         for(Function::iterator I = F->begin(), E = F->end(); I != E; ++I) {
             if (isa<ReturnInst>(I->getTerminator())) {
-                PopGCFrame(gcframe, I->getTerminator());
+                auto popGcframe = CallInst::Create(
+                    jl_intrinsics::getOrDefinePopGCFrame(*this, *F->getParent()),
+                    {gcframe});
+                popGcframe->insertBefore(I->getTerminator());
             }
         }
     }
