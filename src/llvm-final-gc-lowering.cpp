@@ -41,6 +41,9 @@ private:
     // Lowers a `julia.push_gc_frame` intrinsic.
     void lowerPushGCFrame(llvm::CallInst *target, Function &F);
 
+    // Lowers a `julia.pop_gc_frame` intrinsic.
+    void lowerPopGCFrame(llvm::CallInst *target, Function &F);
+
     Instruction *getPgcstack(Instruction *ptlsStates);
 };
 
@@ -63,7 +66,8 @@ llvm::Instruction *FinalLowerGC::lowerNewGCFrame(llvm::CallInst *target, Functio
         ConstantInt::get(Type::getInt8Ty(F.getContext()), 0), // val
         ConstantInt::get(T_int32, sizeof(jl_value_t*)*(nRoots+2)), // len
         ConstantInt::get(T_int32, 0), // align
-        ConstantInt::get(Type::getInt1Ty(F.getContext()), 0)}; // volatile
+        ConstantInt::get(Type::getInt1Ty(F.getContext()), 0) // volatile
+    };
     CallInst *zeroing = CallInst::Create(memset, makeArrayRef(args));
     zeroing->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_gcframe);
     zeroing->insertAfter(tempSlot_i8);
@@ -79,15 +83,39 @@ void FinalLowerGC::lowerPushGCFrame(llvm::CallInst *target, Function &F)
     IRBuilder<> builder(target->getContext());
     builder.SetInsertPoint(&*(++BasicBlock::iterator(target)));
     Instruction *inst =
-        builder.CreateStore(ConstantInt::get(T_size, nRoots << 1),
-                          builder.CreateBitCast(builder.CreateConstGEP1_32(gcframe, 0), T_size->getPointerTo()));
+        builder.CreateStore(
+            ConstantInt::get(T_size, nRoots << 1),
+            builder.CreateBitCast(
+                builder.CreateConstGEP1_32(gcframe, 0),
+                T_size->getPointerTo()));
     inst->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_gcframe);
     Value *pgcstack = builder.Insert(getPgcstack(ptlsStates));
-    inst = builder.CreateStore(builder.CreateLoad(pgcstack),
-                               builder.CreatePointerCast(builder.CreateConstGEP1_32(gcframe, 1), PointerType::get(T_ppjlvalue,0)));
+    inst = builder.CreateStore(
+        builder.CreateLoad(pgcstack),
+        builder.CreatePointerCast(
+            builder.CreateConstGEP1_32(gcframe, 1),
+            PointerType::get(T_ppjlvalue, 0)));
     inst->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_gcframe);
     builder.CreateStore(gcframe, builder.CreateBitCast(pgcstack,
         PointerType::get(PointerType::get(T_prjlvalue, 0), 0)));
+}
+
+void FinalLowerGC::lowerPopGCFrame(llvm::CallInst *target, Function &F)
+{
+    auto gcframe = target->getArgOperand(0);
+
+    IRBuilder<> builder(target->getContext());
+    builder.SetInsertPoint(target);
+    Instruction *gcpop =
+        cast<Instruction>(builder.CreateConstGEP1_32(gcframe, 1));
+    Instruction *inst = builder.CreateLoad(gcpop);
+    inst->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_gcframe);
+    inst = builder.CreateStore(
+        inst,
+        builder.CreateBitCast(
+            builder.Insert(getPgcstack(ptlsStates)),
+            PointerType::get(T_prjlvalue, 0)));
+    inst->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_gcframe);
 }
 
 Instruction *FinalLowerGC::getPgcstack(Instruction *ptlsStates)
@@ -134,6 +162,10 @@ bool FinalLowerGC::runOnFunction(Function &F)
             }
             else if (callee == push_gc_frame_func) {
                 lowerPushGCFrame(CI, F);
+                it = CI->eraseFromParent();
+            }
+            else if (callee == pop_gc_frame_func) {
+                lowerPopGCFrame(CI, F);
                 it = CI->eraseFromParent();
             }
             else {
