@@ -67,7 +67,7 @@ llvm::Instruction *FinalLowerGC::lowerPushNewGCFrame(llvm::CallInst *target, uns
     zeroing->insertAfter(tempSlot_i8);
 
     // Push the GC frame.
-    pushGCFrame(gcframe, nRoots, ptlsStates);
+    pushGCFrame(gcframe, nRoots, target);
 
     return gcframe;
 }
