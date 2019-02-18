@@ -1928,10 +1928,15 @@ void LateLowerGCFrame::PlaceRootsAndUpdateCalls(std::vector<int> &Colors, State 
         unsigned NRoots = MaxColor + 1 + S.Allocas.size();
         // Create and push a GC frame.
         auto gcframe = CallInst::Create(
-            jl_intrinsics::getOrDefinePushNewGCFrame(*this, *ptlsStates->getFunction()->getParent()),
+            jl_intrinsics::getOrDefineNewGCFrame(*this, *F->getParent()),
             {ConstantInt::get(T_size, NRoots)},
-            "pushed_gcframe");
-        gcframe->insertAfter(ptlsStates);
+            "gcframe_ptr");
+        gcframe->insertBefore(&*F->getEntryBlock().begin());
+
+        auto push_gcframe = CallInst::Create(
+            jl_intrinsics::getOrDefinePushGCFrame(*this, *F->getParent()),
+            {gcframe, ConstantInt::get(T_size, NRoots)});
+        push_gcframe->insertAfter(ptlsStates);
 
         // Replace Allocas
         unsigned AllocaSlot = 2;
