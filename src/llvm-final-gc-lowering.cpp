@@ -30,24 +30,27 @@ struct FinalLowerGC: public FunctionPass, private JuliaPassContext {
     { }
 
 private:
-    llvm::CallInst *ptlsStates;
+    CallInst *ptlsStates;
 
     bool doInitialization(Module &M) override;
     bool runOnFunction(Function &F) override;
 
     // Lowers a `julia.new_gc_frame` intrinsic.
-    llvm::Instruction *lowerNewGCFrame(llvm::CallInst *target, Function &F);
+    Value *lowerNewGCFrame(CallInst *target, Function &F);
 
     // Lowers a `julia.push_gc_frame` intrinsic.
-    void lowerPushGCFrame(llvm::CallInst *target, Function &F);
+    void lowerPushGCFrame(CallInst *target, Function &F);
 
     // Lowers a `julia.pop_gc_frame` intrinsic.
-    void lowerPopGCFrame(llvm::CallInst *target, Function &F);
+    void lowerPopGCFrame(CallInst *target, Function &F);
+
+    // Lowers a `julia.get_gc_frame_slot` intrinsic.
+    Value *lowerGetGCFrameSlot(CallInst *target, Function &F);
 
     Instruction *getPgcstack(Instruction *ptlsStates);
 };
 
-llvm::Instruction *FinalLowerGC::lowerNewGCFrame(llvm::CallInst *target, Function &F)
+Value *FinalLowerGC::lowerNewGCFrame(CallInst *target, Function &F)
 {
     unsigned nRoots = cast<ConstantInt>(target->getArgOperand(0))->getLimitedValue(INT_MAX);
 
@@ -72,13 +75,13 @@ llvm::Instruction *FinalLowerGC::lowerNewGCFrame(llvm::CallInst *target, Functio
         ConstantInt::get(Type::getInt1Ty(F.getContext()), 0) // volatile
     };
     CallInst *zeroing = CallInst::Create(memset, makeArrayRef(args));
-    zeroing->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_gcframe);
+    zeroing->setMetadata(LLVMContext::MD_tbaa, tbaa_gcframe);
     zeroing->insertAfter(tempSlot_i8);
 
     return gcframe;
 }
 
-void FinalLowerGC::lowerPushGCFrame(llvm::CallInst *target, Function &F)
+void FinalLowerGC::lowerPushGCFrame(CallInst *target, Function &F)
 {
     auto gcframe = target->getArgOperand(0);
     unsigned nRoots = cast<ConstantInt>(target->getArgOperand(1))->getLimitedValue(INT_MAX);
@@ -91,19 +94,19 @@ void FinalLowerGC::lowerPushGCFrame(llvm::CallInst *target, Function &F)
             builder.CreateBitCast(
                 builder.CreateConstGEP1_32(gcframe, 0),
                 T_size->getPointerTo()));
-    inst->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_gcframe);
+    inst->setMetadata(LLVMContext::MD_tbaa, tbaa_gcframe);
     Value *pgcstack = builder.Insert(getPgcstack(ptlsStates));
     inst = builder.CreateStore(
         builder.CreateLoad(pgcstack),
         builder.CreatePointerCast(
             builder.CreateConstGEP1_32(gcframe, 1),
             PointerType::get(T_ppjlvalue, 0)));
-    inst->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_gcframe);
+    inst->setMetadata(LLVMContext::MD_tbaa, tbaa_gcframe);
     builder.CreateStore(gcframe, builder.CreateBitCast(pgcstack,
         PointerType::get(PointerType::get(T_prjlvalue, 0), 0)));
 }
 
-void FinalLowerGC::lowerPopGCFrame(llvm::CallInst *target, Function &F)
+void FinalLowerGC::lowerPopGCFrame(CallInst *target, Function &F)
 {
     auto gcframe = target->getArgOperand(0);
 
@@ -112,22 +115,41 @@ void FinalLowerGC::lowerPopGCFrame(llvm::CallInst *target, Function &F)
     Instruction *gcpop =
         cast<Instruction>(builder.CreateConstGEP1_32(gcframe, 1));
     Instruction *inst = builder.CreateLoad(gcpop);
-    inst->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_gcframe);
+    inst->setMetadata(LLVMContext::MD_tbaa, tbaa_gcframe);
     inst = builder.CreateStore(
         inst,
         builder.CreateBitCast(
             builder.Insert(getPgcstack(ptlsStates)),
             PointerType::get(T_prjlvalue, 0)));
-    inst->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_gcframe);
+    inst->setMetadata(LLVMContext::MD_tbaa, tbaa_gcframe);
+}
+
+Value *FinalLowerGC::lowerGetGCFrameSlot(CallInst *target, Function &F)
+{
+    auto gcframe = target->getArgOperand(0);
+    auto index = target->getArgOperand(1);
+
+    // Initialize an IR builder.
+    IRBuilder<> builder(target->getContext());
+    builder.SetInsertPoint(target);
+
+    // The first two slots are reserved, so we'll add two to the index.
+    index = builder.CreateAdd(index, ConstantInt::get(T_int32, 2));
+
+    // Lower the intrinsic as a GEP.
+    auto gep = builder.CreateGEP(gcframe, index);
+    gep->takeName(target);
+    return gep;
 }
 
 Instruction *FinalLowerGC::getPgcstack(Instruction *ptlsStates)
 {
     Constant *offset = ConstantInt::getSigned(T_int32, offsetof(jl_tls_states_t, pgcstack) / sizeof(void*));
-    return GetElementPtrInst::Create(nullptr,
-                                     ptlsStates,
-                                     ArrayRef<Value*>(offset),
-                                     "jl_pgcstack");
+    return GetElementPtrInst::Create(
+        nullptr,
+        ptlsStates,
+        ArrayRef<Value*>(offset),
+        "jl_pgcstack");
 }
 
 bool FinalLowerGC::doInitialization(Module &M)
@@ -150,9 +172,10 @@ bool FinalLowerGC::runOnFunction(Function &F)
         return true;
 
     // Acquire intrinsic functions.
-    auto new_gc_frame_func = getOrNull(jl_intrinsics::newGCFrame);
-    auto push_gc_frame_func = getOrNull(jl_intrinsics::pushGCFrame);
-    auto pop_gc_frame_func = getOrNull(jl_intrinsics::popGCFrame);
+    auto newGCFrameFunc = getOrNull(jl_intrinsics::newGCFrame);
+    auto pushGCFrameFunc = getOrNull(jl_intrinsics::pushGCFrame);
+    auto popGCFrameFunc = getOrNull(jl_intrinsics::popGCFrame);
+    auto getGCFrameSlotFunc = getOrNull(jl_intrinsics::getGCFrameSlot);
 
     // Lower all calls to supported intrinsics.
     for (BasicBlock &BB : F) {
@@ -165,16 +188,20 @@ bool FinalLowerGC::runOnFunction(Function &F)
 
             auto callee = CI->getCalledValue();
 
-            if (callee == new_gc_frame_func) {
+            if (callee == newGCFrameFunc) {
                 CI->replaceAllUsesWith(lowerNewGCFrame(CI, F));
                 it = CI->eraseFromParent();
             }
-            else if (callee == push_gc_frame_func) {
+            else if (callee == pushGCFrameFunc) {
                 lowerPushGCFrame(CI, F);
                 it = CI->eraseFromParent();
             }
-            else if (callee == pop_gc_frame_func) {
+            else if (callee == popGCFrameFunc) {
                 lowerPopGCFrame(CI, F);
+                it = CI->eraseFromParent();
+            }
+            else if (callee == getGCFrameSlotFunc) {
+                CI->replaceAllUsesWith(lowerGetGCFrameSlot(CI, F));
                 it = CI->eraseFromParent();
             }
             else {

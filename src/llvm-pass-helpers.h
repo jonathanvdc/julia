@@ -18,7 +18,7 @@ namespace jl_intrinsics {
     // intrinsics and materialize new intrinsics if necessary.
     struct IntrinsicDescription final {
         // The type of function that defines a new intrinsic.
-        typedef llvm::Function *(*DefinitionFunction)(llvm::Module &M, const JuliaPassContext&);
+        typedef llvm::Function *(*DefinitionFunction)(llvm::Module&, const JuliaPassContext&);
 
         // Creates an intrinsic description with a particular
         // name and definition function.
@@ -99,6 +99,9 @@ namespace jl_intrinsics {
 
     // An intrinsic that pops a GC frame.
     extern const IntrinsicDescription popGCFrame;
+
+    // An intrinsic that creates a pointer to a GC frame slot.
+    extern const IntrinsicDescription getGCFrameSlot;
 }
 
 #endif
