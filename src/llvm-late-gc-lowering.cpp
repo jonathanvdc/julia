@@ -1905,7 +1905,7 @@ void LateLowerGCFrame::PlaceRootsAndUpdateCalls(std::vector<int> &Colors, State 
         auto gcframe = CallInst::Create(
             getOrDefine(jl_intrinsics::newGCFrame, *F->getParent()),
             {ConstantInt::get(T_size, NRoots)},
-            "gcframe_ptr");
+            "gcframe");
         gcframe->insertBefore(&*F->getEntryBlock().begin());
 
         auto pushGcframe = CallInst::Create(
