@@ -10,7 +10,7 @@
 #include "codegen_shared.h"
 #include "julia.h"
 #include "julia_internal.h"
-#include "llvm-late-gc-helpers.h"
+#include "llvm-pass-helpers.h"
 
 #define DEBUG_TYPE "final_gc_lowering"
 
@@ -24,7 +24,7 @@ using namespace llvm;
 // This pass targets typical back-ends for which the standard Julia
 // runtime library is available. Atypical back-ends should supply
 // their own lowering pass.
-struct FinalLowerGC: public FunctionPass, private GCLoweringRefs {
+struct FinalLowerGC: public FunctionPass, private JuliaPassContext {
     static char ID;
     FinalLowerGC() : FunctionPass(ID)
     { }

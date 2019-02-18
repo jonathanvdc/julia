@@ -14,13 +14,13 @@
 #include "llvm-version.h"
 #include "codegen_shared.h"
 #include "julia_assert.h"
-#include "llvm-late-gc-helpers.h"
+#include "llvm-pass-helpers.h"
 
 using namespace llvm;
 
 extern std::pair<MDNode*,MDNode*> tbaa_make_child(const char *name, MDNode *parent=nullptr, bool isConstant=false);
 
-GCLoweringRefs::GCLoweringRefs()
+JuliaPassContext::JuliaPassContext()
     : module(nullptr), T_prjlvalue(nullptr), T_ppjlvalue(nullptr), T_size(nullptr),
         T_int8(nullptr), T_int32(nullptr), T_pint8(nullptr), T_pjlvalue(nullptr),
         T_pjlvalue_der(nullptr), T_ppjlvalue_der(nullptr), ptls_getter(nullptr),
@@ -35,7 +35,7 @@ GCLoweringRefs::GCLoweringRefs()
     tbaa_tag = tbaa_make_child("jtbaa_tag", tbaa_data_scalar).first;
 }
 
-void GCLoweringRefs::initFunctions(Module &M)
+void JuliaPassContext::initFunctions(Module &M)
 {
     module = &M;
 
@@ -49,7 +49,7 @@ void GCLoweringRefs::initFunctions(Module &M)
     alloc_obj_func = M.getFunction("julia.gc_alloc_obj");
 }
 
-void GCLoweringRefs::initAll(Module &M)
+void JuliaPassContext::initAll(Module &M)
 {
     // First initialize the functions.
     initFunctions(M);
@@ -89,7 +89,7 @@ void GCLoweringRefs::initAll(Module &M)
     }
 }
 
-llvm::CallInst *GCLoweringRefs::getPtls(llvm::Function &F) const
+llvm::CallInst *JuliaPassContext::getPtls(llvm::Function &F) const
 {
     for (auto I = F.getEntryBlock().begin(), E = F.getEntryBlock().end();
          ptls_getter && I != E; ++I) {
@@ -102,13 +102,13 @@ llvm::CallInst *GCLoweringRefs::getPtls(llvm::Function &F) const
     return nullptr;
 }
 
-llvm::Function *GCLoweringRefs::getOrNull(
+llvm::Function *JuliaPassContext::getOrNull(
     const jl_intrinsics::IntrinsicDescription &desc) const
 {
     return module->getFunction(desc.name);
 }
 
-llvm::Function *GCLoweringRefs::getOrDefine(
+llvm::Function *JuliaPassContext::getOrDefine(
     const jl_intrinsics::IntrinsicDescription &desc) const
 {
     auto local = getOrNull(desc);
@@ -127,9 +127,9 @@ namespace jl_intrinsics {
 
     const IntrinsicDescription newGCFrame(
         NEW_GC_FRAME_NAME,
-        [](llvm::Module &M, const GCLoweringRefs &refs) {
+        [](llvm::Module &M, const JuliaPassContext &context) {
             auto intrinsic = Function::Create(
-                FunctionType::get(PointerType::get(refs.T_prjlvalue, 0), {refs.T_size}, false),
+                FunctionType::get(PointerType::get(context.T_prjlvalue, 0), {context.T_size}, false),
                 Function::ExternalLinkage,
                 NEW_GC_FRAME_NAME,
                 &M);
@@ -141,11 +141,11 @@ namespace jl_intrinsics {
 
     const IntrinsicDescription pushGCFrame(
         PUSH_GC_FRAME_NAME,
-        [](llvm::Module &M, const GCLoweringRefs &refs) {
+        [](llvm::Module &M, const JuliaPassContext &context) {
             auto intrinsic = Function::Create(
                 FunctionType::get(
                     Type::getVoidTy(M.getContext()),
-                    {PointerType::get(refs.T_prjlvalue, 0), refs.T_size},
+                    {PointerType::get(context.T_prjlvalue, 0), context.T_size},
                     false),
                 Function::ExternalLinkage,
                 PUSH_GC_FRAME_NAME,
@@ -156,11 +156,11 @@ namespace jl_intrinsics {
 
     const IntrinsicDescription popGCFrame(
         POP_GC_FRAME_NAME,
-        [](llvm::Module &M, const GCLoweringRefs &refs) {
+        [](llvm::Module &M, const JuliaPassContext &context) {
             auto intrinsic = Function::Create(
                 FunctionType::get(
                     Type::getVoidTy(M.getContext()),
-                    {PointerType::get(refs.T_prjlvalue, 0)},
+                    {PointerType::get(context.T_prjlvalue, 0)},
                     false),
                 Function::ExternalLinkage,
                 POP_GC_FRAME_NAME,
