@@ -144,15 +144,15 @@ bool FinalLowerGC::runOnFunction(Function &F)
     if (!ptls_getter)
         return true;
 
+    // Look for a call to 'julia.ptls_states'.
     ptlsStates = getPtls(F);
     if (!ptlsStates)
         return true;
 
-    auto &M = *F.getParent();
-
-    auto new_gc_frame_func = getOrNull(jl_intrinsics::newGCFrame, M);
-    auto push_gc_frame_func = getOrNull(jl_intrinsics::pushGCFrame, M);
-    auto pop_gc_frame_func = getOrNull(jl_intrinsics::popGCFrame, M);
+    // Acquire intrinsic functions.
+    auto new_gc_frame_func = getOrNull(jl_intrinsics::newGCFrame);
+    auto push_gc_frame_func = getOrNull(jl_intrinsics::pushGCFrame);
+    auto pop_gc_frame_func = getOrNull(jl_intrinsics::popGCFrame);
 
     // Lower all calls to supported intrinsics.
     for (BasicBlock &BB : F) {

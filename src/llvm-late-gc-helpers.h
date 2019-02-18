@@ -9,7 +9,6 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
-#include <functional>
 
 struct GCLoweringRefs;
 
@@ -19,7 +18,7 @@ namespace jl_intrinsics {
     // in any environment.
     struct IntrinsicDescription final {
         // The type of function that defines a new intrinsic.
-        typedef std::function<llvm::Function *(const GCLoweringRefs&, llvm::Module &M)> DefinitionFunction;
+        typedef llvm::Function *(*DefinitionFunction)(llvm::Module &M, const GCLoweringRefs&);
 
         // Creates an intrinsic description with a particular
         // name and definition function.
@@ -39,6 +38,8 @@ namespace jl_intrinsics {
 // A data structure that contains references to platform-agnostic GC lowering
 // types, metadata and functions.
 struct GCLoweringRefs {
+    llvm::Module *module;
+
     llvm::Type *T_prjlvalue;
     llvm::Type *T_ppjlvalue;
     llvm::Type *T_size;
@@ -64,9 +65,11 @@ struct GCLoweringRefs {
     GCLoweringRefs();
 
     // Populates a GC lowering refs structure by inspecting a module.
+    // Also sets the current module to the given module.
     void initAll(llvm::Module &M);
 
     // Initializes a GC lowering refs structure's functions only.
+    // Also sets the current module to the given module.
     void initFunctions(llvm::Module &M);
 
     // Gets a call to the `julia.ptls_states` intrinisc in the entry
@@ -77,15 +80,13 @@ struct GCLoweringRefs {
     // Gets the intrinsic that conforms to the given description
     // if it exists in the module. If not, `nullptr` is returned.
     llvm::Function *getOrNull(
-        const jl_intrinsics::IntrinsicDescription &desc,
-        llvm::Module &M) const;
+        const jl_intrinsics::IntrinsicDescription &desc) const;
 
     // Gets the intrinsic that conforms to the given description
     // if it exists in the module. If not, creates the intrinsic
     // and adds it to the module.
     llvm::Function *getOrDefine(
-        const jl_intrinsics::IntrinsicDescription &desc,
-        llvm::Module &M) const;
+        const jl_intrinsics::IntrinsicDescription &desc) const;
 };
 
 namespace jl_intrinsics {
