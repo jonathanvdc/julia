@@ -18,77 +18,7 @@
 
 using namespace llvm;
 
-static const char* NEW_GC_FRAME_NAME = "julia.new_gc_frame";
-static const char* PUSH_GC_FRAME_NAME = "julia.push_gc_frame";
-static const char* POP_GC_FRAME_NAME = "julia.pop_gc_frame";
-
 extern std::pair<MDNode*,MDNode*> tbaa_make_child(const char *name, MDNode *parent=nullptr, bool isConstant=false);
-
-namespace jl_intrinsics {
-    llvm::Function* getOrDefineNewGCFrame(const GCLoweringRefs &refs, llvm::Module &M)
-    {
-        // We may have already defined the intrinsic. If so, return
-        // that value.
-        auto local = M.getFunction(NEW_GC_FRAME_NAME);
-        if (local) {
-            return local;
-        }
-
-        // Otherwise, we'll just have to define it from scratch.
-        auto intrinsic = Function::Create(
-            FunctionType::get(PointerType::get(refs.T_prjlvalue, 0), {refs.T_size}, false),
-            Function::ExternalLinkage,
-            NEW_GC_FRAME_NAME,
-            &M);
-        intrinsic->addAttribute(AttributeList::ReturnIndex, Attribute::NonNull);
-
-        return intrinsic;
-    }
-
-    llvm::Function* getOrDefinePushGCFrame(const GCLoweringRefs &refs, llvm::Module &M)
-    {
-        // We may have already defined the intrinsic. If so, return
-        // that value.
-        auto local = M.getFunction(PUSH_GC_FRAME_NAME);
-        if (local) {
-            return local;
-        }
-
-        // Otherwise, we'll just have to define it from scratch.
-        auto intrinsic = Function::Create(
-            FunctionType::get(
-                Type::getVoidTy(M.getContext()),
-                {PointerType::get(refs.T_prjlvalue, 0), refs.T_size},
-                false),
-            Function::ExternalLinkage,
-            PUSH_GC_FRAME_NAME,
-            &M);
-
-        return intrinsic;
-    }
-
-    llvm::Function* getOrDefinePopGCFrame(const GCLoweringRefs &refs, llvm::Module &M)
-    {
-        // We may have already defined the intrinsic. If so, return
-        // that value.
-        auto local = M.getFunction(POP_GC_FRAME_NAME);
-        if (local) {
-            return local;
-        }
-
-        // Otherwise, we'll just have to define it from scratch.
-        auto intrinsic = Function::Create(
-            FunctionType::get(
-                Type::getVoidTy(M.getContext()),
-                {PointerType::get(refs.T_prjlvalue, 0)},
-                false),
-            Function::ExternalLinkage,
-            POP_GC_FRAME_NAME,
-            &M);
-
-        return intrinsic;
-    }
-}
 
 GCLoweringRefs::GCLoweringRefs()
     : T_prjlvalue(nullptr), T_ppjlvalue(nullptr), T_size(nullptr), T_int8(nullptr),
@@ -116,9 +46,9 @@ void GCLoweringRefs::initFunctions(Module &M)
     typeof_func = M.getFunction("julia.typeof");
     write_barrier_func = M.getFunction("julia.write_barrier");
     alloc_obj_func = M.getFunction("julia.gc_alloc_obj");
-    new_gc_frame_func = M.getFunction(NEW_GC_FRAME_NAME);
-    push_gc_frame_func = M.getFunction(PUSH_GC_FRAME_NAME);
-    pop_gc_frame_func = M.getFunction(POP_GC_FRAME_NAME);
+    new_gc_frame_func = getOrNull(jl_intrinsics::newGCFrame, M);
+    push_gc_frame_func = getOrNull(jl_intrinsics::pushGCFrame, M);
+    pop_gc_frame_func = getOrNull(jl_intrinsics::popGCFrame, M);
 }
 
 void GCLoweringRefs::initAll(Module &M)
@@ -172,4 +102,73 @@ llvm::CallInst *GCLoweringRefs::getPtls(llvm::Function &F) const
         }
     }
     return nullptr;
+}
+
+llvm::Function *GCLoweringRefs::getOrNull(
+    const jl_intrinsics::IntrinsicDescription &desc,
+    llvm::Module &M) const
+{
+    return M.getFunction(desc.name);
+}
+
+llvm::Function *GCLoweringRefs::getOrDefine(
+    const jl_intrinsics::IntrinsicDescription &desc,
+    llvm::Module &M) const
+{
+    auto local = getOrNull(desc, M);
+    if (local) {
+        return local;
+    }
+    else {
+        return desc.define(*this, M);
+    }
+}
+
+namespace jl_intrinsics {
+    static const char* NEW_GC_FRAME_NAME = "julia.new_gc_frame";
+    static const char* PUSH_GC_FRAME_NAME = "julia.push_gc_frame";
+    static const char* POP_GC_FRAME_NAME = "julia.pop_gc_frame";
+
+    const IntrinsicDescription newGCFrame(
+        NEW_GC_FRAME_NAME,
+        [](const GCLoweringRefs &refs, llvm::Module &M) {
+            auto intrinsic = Function::Create(
+                FunctionType::get(PointerType::get(refs.T_prjlvalue, 0), {refs.T_size}, false),
+                Function::ExternalLinkage,
+                NEW_GC_FRAME_NAME,
+                &M);
+            intrinsic->addAttribute(AttributeList::ReturnIndex, Attribute::NonNull);
+
+            return intrinsic;
+        });
+
+    const IntrinsicDescription pushGCFrame(
+        PUSH_GC_FRAME_NAME,
+        [](const GCLoweringRefs &refs, llvm::Module &M) {
+            auto intrinsic = Function::Create(
+                FunctionType::get(
+                    Type::getVoidTy(M.getContext()),
+                    {PointerType::get(refs.T_prjlvalue, 0), refs.T_size},
+                    false),
+                Function::ExternalLinkage,
+                PUSH_GC_FRAME_NAME,
+                &M);
+
+            return intrinsic;
+        });
+
+    const IntrinsicDescription popGCFrame(
+        POP_GC_FRAME_NAME,
+        [](const GCLoweringRefs &refs, llvm::Module &M) {
+            auto intrinsic = Function::Create(
+                FunctionType::get(
+                    Type::getVoidTy(M.getContext()),
+                    {PointerType::get(refs.T_prjlvalue, 0)},
+                    false),
+                Function::ExternalLinkage,
+                POP_GC_FRAME_NAME,
+                &M);
+
+            return intrinsic;
+        });
 }

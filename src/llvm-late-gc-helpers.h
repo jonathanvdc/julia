@@ -9,6 +9,32 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <functional>
+
+struct GCLoweringRefs;
+
+// A namespace for intrinsics definitions.
+namespace jl_intrinsics {
+    // An "intrinsic description," i.e., a function that can define an intrinsic
+    // in any environment.
+    struct IntrinsicDescription final {
+        // The type of function that defines a new intrinsic.
+        typedef std::function<llvm::Function *(const GCLoweringRefs&, llvm::Module &M)> DefinitionFunction;
+
+        // Creates an intrinsic description with a particular
+        // name and definition function.
+        IntrinsicDescription(
+            const llvm::StringRef &name,
+            const DefinitionFunction &define)
+            : name(name), define(define)
+        { }
+
+        // The intrinsic's name.
+        llvm::StringRef name;
+        // A function that defines the intrinsic in a module.
+        DefinitionFunction define;
+    };
+}
 
 // A data structure that contains references to platform-agnostic GC lowering
 // types, metadata and functions.
@@ -50,21 +76,30 @@ struct GCLoweringRefs {
     // point of the given function, if there exists such a call.
     // Otherwise, `nullptr` is returned.
     llvm::CallInst *getPtls(llvm::Function &F) const;
+
+    // Gets the intrinsic that conforms to the given description
+    // if it exists in the module. If not, `nullptr` is returned.
+    llvm::Function *getOrNull(
+        const jl_intrinsics::IntrinsicDescription &desc,
+        llvm::Module &M) const;
+
+    // Gets the intrinsic that conforms to the given description
+    // if it exists in the module. If not, creates the intrinsic
+    // and adds it to the module.
+    llvm::Function *getOrDefine(
+        const jl_intrinsics::IntrinsicDescription &desc,
+        llvm::Module &M) const;
 };
 
-// A namespace for getting and creating intrinsics.
 namespace jl_intrinsics {
-    // Gets or creates an intrinsic that creates a new GC frame.
-    // The intrinsic gets added to the module if it doesn't exist already.
-    llvm::Function *getOrDefineNewGCFrame(const GCLoweringRefs &refs, llvm::Module &M);
+    // An intrinsic that creates a new GC frame.
+    extern const IntrinsicDescription newGCFrame;
 
-    // Gets or creates an intrinsic that pushes a GC frame.
-    // The intrinsic gets added to the module if it doesn't exist already.
-    llvm::Function *getOrDefinePushGCFrame(const GCLoweringRefs &refs, llvm::Module &M);
+    // An intrinsic that pushes a GC frame.
+    extern const IntrinsicDescription pushGCFrame;
 
-    // Gets or creates an intrinsic that pops a GC frame.
-    // The intrinsic gets added to the module if it doesn't exist already.
-    llvm::Function *getOrDefinePopGCFrame(const GCLoweringRefs &refs, llvm::Module &M);
+    // An intrinsic that pops a GC frame.
+    extern const IntrinsicDescription popGCFrame;
 }
 
 #endif
