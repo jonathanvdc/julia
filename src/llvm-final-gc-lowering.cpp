@@ -52,6 +52,7 @@ private:
 
 Value *FinalLowerGC::lowerNewGCFrame(CallInst *target, Function &F)
 {
+    assert(target->getNumArgOperands() == 1);
     unsigned nRoots = cast<ConstantInt>(target->getArgOperand(0))->getLimitedValue(INT_MAX);
 
     // Create the GC frame.
@@ -83,6 +84,7 @@ Value *FinalLowerGC::lowerNewGCFrame(CallInst *target, Function &F)
 
 void FinalLowerGC::lowerPushGCFrame(CallInst *target, Function &F)
 {
+    assert(target->getNumArgOperands() == 2);
     auto gcframe = target->getArgOperand(0);
     unsigned nRoots = cast<ConstantInt>(target->getArgOperand(1))->getLimitedValue(INT_MAX);
 
@@ -108,6 +110,7 @@ void FinalLowerGC::lowerPushGCFrame(CallInst *target, Function &F)
 
 void FinalLowerGC::lowerPopGCFrame(CallInst *target, Function &F)
 {
+    assert(target->getNumArgOperands() == 1);
     auto gcframe = target->getArgOperand(0);
 
     IRBuilder<> builder(target->getContext());
@@ -126,6 +129,7 @@ void FinalLowerGC::lowerPopGCFrame(CallInst *target, Function &F)
 
 Value *FinalLowerGC::lowerGetGCFrameSlot(CallInst *target, Function &F)
 {
+    assert(target->getNumArgOperands() == 3);
     auto gcframe = target->getArgOperand(0);
     auto index = target->getArgOperand(1);
 
