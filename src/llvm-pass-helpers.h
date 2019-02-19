@@ -61,15 +61,15 @@ struct JuliaPassContext {
     llvm::Function *typeof_func;
     llvm::Function *write_barrier_func;
 
-    // Creates a GC lowering refs structure. Type and function pointers
+    // Creates a pass context. Type and function pointers
     // are set to `nullptr`. Metadata nodes are initialized.
     JuliaPassContext();
 
-    // Populates a GC lowering refs structure by inspecting a module.
+    // Populates a pass context by inspecting a module.
     // Also sets the current module to the given module.
     void initAll(llvm::Module &M);
 
-    // Initializes a GC lowering refs structure's functions only.
+    // Initializes a pass context's functions only.
     // Also sets the current module to the given module.
     void initFunctions(llvm::Module &M);
 
