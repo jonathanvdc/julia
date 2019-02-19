@@ -1688,6 +1688,7 @@ bool LateLowerGCFrame::CleanupIR(Function &F, State *S) {
                 auto newI = builder.CreateCall(
                     getOrDefine(jl_intrinsics::GCAllocBytes),
                     { CI->getArgOperand(0), CI->getArgOperand(1) });
+                newI->takeName(CI);
 
                 // Set the tag.
                 auto store = builder.CreateStore(
