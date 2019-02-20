@@ -81,7 +81,8 @@ struct JuliaPassContext {
     void initFunctions(llvm::Module &M);
 
     // Gets the LLVM context for this pass context.
-    llvm::LLVMContext &getLLVMContext() const {
+    llvm::LLVMContext &getLLVMContext() const
+    {
         return module->getContext();
     }
 
