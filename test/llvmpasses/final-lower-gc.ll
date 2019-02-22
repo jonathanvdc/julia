@@ -21,8 +21,6 @@ define void @gc_frame_lowering(i64 %a, i64 %b) {
 top:
 ; CHECK-LABEL: @gc_frame_lowering
 ; CHECK: %gcframe = alloca %jl_value_t addrspace(10)*, i32 4
-; CHECK-NEXT: [[GCFRAME_BYTES:%.*]] = bitcast %jl_value_t addrspace(10)** %gcframe to i8*
-; CHECK-NEXT: call void @llvm.memset.p0i8.i32(i8* [[GCFRAME_BYTES]], i8 0, i32 32, i32 0, i1 false), !tbaa !0
   %gcframe = call %jl_value_t addrspace(10)** @julia.new_gc_frame(i32 2)
 ; CHECK: %ptls = call %jl_value_t*** @julia.ptls_states()
   %ptls = call %jl_value_t*** @julia.ptls_states()
@@ -62,7 +60,7 @@ top:
 ; CHECK-LABEL: @gc_alloc_lowering
   %ptls = call %jl_value_t*** @julia.ptls_states()
   %ptls_i8 = bitcast %jl_value_t*** %ptls to i8*
-; CHECK: %v = call noalias nonnull %jl_value_t addrspace(10)* @jl_gc_pool_alloc(i8* %ptls_i8, i32 [[POOL:[0-9]+]], i32 16) #0
+; CHECK: %v = call noalias nonnull %jl_value_t addrspace(10)* @jl_gc_pool_alloc
   %v = call %jl_value_t addrspace(10)* @julia.gc_alloc_bytes(i8* %ptls_i8, i64 8)
   %0 = bitcast %jl_value_t addrspace(10)* %v to %jl_value_t addrspace(10)* addrspace(10)*
   %1 = getelementptr %jl_value_t addrspace(10)*, %jl_value_t addrspace(10)* addrspace(10)* %0, i64 -1

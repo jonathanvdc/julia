@@ -1685,9 +1685,16 @@ bool LateLowerGCFrame::CleanupIR(Function &F, State *S) {
 
                 // Create a call to the `julia.gc_alloc_bytes` intrinsic, which is like
                 // `julia.gc_alloc_obj` except it doesn't set the tag.
+                auto allocBytesIntrinsic = getOrDeclare(jl_intrinsics::GCAllocBytes);
                 auto newI = builder.CreateCall(
-                    getOrDeclare(jl_intrinsics::GCAllocBytes),
-                    { CI->getArgOperand(0), CI->getArgOperand(1) });
+                    allocBytesIntrinsic,
+                    {
+                        CI->getArgOperand(0),
+                        builder.CreateIntCast(
+                            CI->getArgOperand(1),
+                            allocBytesIntrinsic->getFunctionType()->getParamType(1),
+                            false)
+                    });
                 newI->takeName(CI);
 
                 // Set the tag.
