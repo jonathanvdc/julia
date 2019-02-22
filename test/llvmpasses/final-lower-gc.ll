@@ -9,8 +9,8 @@ declare %jl_value_t*** @julia.ptls_states()
 declare void @jl_safepoint()
 declare %jl_value_t addrspace(10)* @jl_apply_generic(%jl_value_t addrspace(10)*, %jl_value_t addrspace(10)**, i32)
 
-declare noalias nonnull %jl_value_t addrspace(10)** @julia.new_gc_frame(i64)
-declare void @julia.push_gc_frame(%jl_value_t addrspace(10)**, i64)
+declare noalias nonnull %jl_value_t addrspace(10)** @julia.new_gc_frame(i32)
+declare void @julia.push_gc_frame(%jl_value_t addrspace(10)**, i32)
 declare %jl_value_t addrspace(10)** @julia.get_gc_frame_slot(%jl_value_t addrspace(10)**, i32)
 declare void @julia.pop_gc_frame(%jl_value_t addrspace(10)**)
 declare noalias nonnull %jl_value_t addrspace(10)* @julia.gc_alloc_bytes(i8*, i64) #0
@@ -23,7 +23,7 @@ top:
 ; CHECK: %gcframe = alloca %jl_value_t addrspace(10)*, i32 4
 ; CHECK-NEXT: [[GCFRAME_BYTES:%.*]] = bitcast %jl_value_t addrspace(10)** %gcframe to i8*
 ; CHECK-NEXT: call void @llvm.memset.p0i8.i32(i8* [[GCFRAME_BYTES]], i8 0, i32 32, i32 0, i1 false), !tbaa !0
-  %gcframe = call %jl_value_t addrspace(10)** @julia.new_gc_frame(i64 2)
+  %gcframe = call %jl_value_t addrspace(10)** @julia.new_gc_frame(i32 2)
 ; CHECK: %ptls = call %jl_value_t*** @julia.ptls_states()
   %ptls = call %jl_value_t*** @julia.ptls_states()
 ; CHECK-NEXT: [[GCFRAME_SIZE_PTR:%.*]] = getelementptr %jl_value_t addrspace(10)*, %jl_value_t addrspace(10)** %gcframe, i32 0
@@ -36,7 +36,7 @@ top:
 ; CHECK-NEXT: store %jl_value_t** [[PREV_GCFRAME]], %jl_value_t*** [[PREV_GCFRAME_PTR2]], !tbaa !0
 ; CHECK-NEXT: [[GCFRAME_SLOT2:%.*]] = bitcast %jl_value_t*** [[GCFRAME_SLOT]] to %jl_value_t addrspace(10)***
 ; CHECK-NEXT: store %jl_value_t addrspace(10)** %gcframe, %jl_value_t addrspace(10)*** [[GCFRAME_SLOT2]]
-  call void @julia.push_gc_frame(%jl_value_t addrspace(10)** %gcframe, i64 2)
+  call void @julia.push_gc_frame(%jl_value_t addrspace(10)** %gcframe, i32 2)
   %aboxed = call %jl_value_t addrspace(10)* @jl_box_int64(i64 signext %a)
 ; CHECK: %frame_slot_1 = getelementptr %jl_value_t addrspace(10)*, %jl_value_t addrspace(10)** %gcframe, i32 3
   %frame_slot_1 = call %jl_value_t addrspace(10)** @julia.get_gc_frame_slot(%jl_value_t addrspace(10)** %gcframe, i32 1)
