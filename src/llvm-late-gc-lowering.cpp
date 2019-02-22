@@ -1902,13 +1902,13 @@ void LateLowerGCFrame::PlaceRootsAndUpdateCalls(std::vector<int> &Colors, State 
         // Create and push a GC frame.
         auto gcframe = CallInst::Create(
             getOrDeclare(jl_intrinsics::newGCFrame),
-            {ConstantInt::get(T_size, NRoots)},
+            {ConstantInt::get(T_int32, NRoots)},
             "gcframe");
         gcframe->insertBefore(&*F->getEntryBlock().begin());
 
         auto pushGcframe = CallInst::Create(
             getOrDeclare(jl_intrinsics::pushGCFrame),
-            {gcframe, ConstantInt::get(T_size, NRoots)});
+            {gcframe, ConstantInt::get(T_int32, NRoots)});
         pushGcframe->insertAfter(ptlsStates);
 
         // Replace Allocas

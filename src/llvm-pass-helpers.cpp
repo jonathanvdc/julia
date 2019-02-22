@@ -175,7 +175,7 @@ namespace jl_intrinsics {
         NEW_GC_FRAME_NAME,
         [](const JuliaPassContext &context) {
             auto intrinsic = Function::Create(
-                FunctionType::get(PointerType::get(context.T_prjlvalue, 0), {context.T_size}, false),
+                FunctionType::get(PointerType::get(context.T_prjlvalue, 0), {context.T_int32}, false),
                 Function::ExternalLinkage,
                 NEW_GC_FRAME_NAME);
             intrinsic->addAttribute(AttributeList::ReturnIndex, Attribute::NoAlias);
@@ -190,7 +190,7 @@ namespace jl_intrinsics {
             return Function::Create(
                 FunctionType::get(
                     Type::getVoidTy(context.getLLVMContext()),
-                    {PointerType::get(context.T_prjlvalue, 0), context.T_size},
+                    {PointerType::get(context.T_prjlvalue, 0), context.T_int32},
                     false),
                 Function::ExternalLinkage,
                 PUSH_GC_FRAME_NAME);
