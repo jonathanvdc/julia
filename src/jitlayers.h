@@ -33,8 +33,24 @@ extern Function *juliapersonality_func;
 
 typedef struct {Value *gv; int32_t index;} jl_value_llvm; // uses 1-based indexing
 
+// Specifies the degree to which intrinsics are lowered by the
+// pass pipeline.
+enum class IntrinsicLoweringLevel : int {
+    // Do not lower intrinsics.
+    none = 0,
+    // Perform intrinsic lowering but stop right after the
+    // LateLowerGCFrame pass.
+    lateGC = 1,
+    // Lower all intrinsics.
+    all = 2
+};
+
 void addTargetPasses(legacy::PassManagerBase *PM, TargetMachine *TM);
-void addOptimizationPasses(legacy::PassManagerBase *PM, int opt_level, bool lower_intrinsics=true, bool dump_native=false);
+void addOptimizationPasses(
+    legacy::PassManagerBase *PM,
+    int opt_level,
+    IntrinsicLoweringLevel intrinsic_lowering_level=IntrinsicLoweringLevel::all,
+    bool dump_native=false);
 void* jl_emit_and_add_to_shadow(GlobalVariable *gv, void *gvarinit = NULL);
 void* jl_get_globalvar(GlobalVariable *gv);
 GlobalVariable *jl_get_global_for(const char *cname, void *addr, Module *M);
